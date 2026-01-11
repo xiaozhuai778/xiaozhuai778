@@ -1,4 +1,4 @@
--- ROBLOX 悬浮窗 UI
+﻿-- ROBLOX 悬浮窗 UI
 -- 现代化设计的游戏开发工具界面
 
 local Players = game:GetService("Players")
@@ -1735,16 +1735,16 @@ local function createPlayerOverhead(plr)
                 local upgrades = plr.Upgrades
                 local infoText = ""
                 if upgrades:FindFirstChild("MaxSize") then
-                    infoText = infoText .. "体积:" .. upgrades.MaxSize.Value .. " "
+                    infoText = infoText .. "体积:" .. math.floor(((upgrades.MaxSize.Value + 0.5) ^ 2 - 0.25) / 2 * 100) .. " "
                 end
                 if upgrades:FindFirstChild("Speed") then
-                    infoText = infoText .. "移速:" .. upgrades.Speed.Value .. "\n"
+                    infoText = infoText .. "移速:" .. math.floor(upgrades.Speed.Value * 2 + 10) .. "`n"
                 end
                 if upgrades:FindFirstChild("Multiplier") then
-                    infoText = infoText .. "乘数:" .. upgrades.Multiplier.Value .. " "
+                    infoText = infoText .. "乘数:" .. math.floor(upgrades.Multiplier.Value) .. " "
                 end
                 if upgrades:FindFirstChild("EatSpeed") then
-                    infoText = infoText .. "吃速:" .. upgrades.EatSpeed.Value
+                    infoText = infoText .. "吃速:" .. (math.floor((1 + (upgrades.EatSpeed.Value - 1) * 0.2) * 10) / 10)
                 end
                 
                 local infoLabel = Instance.new("TextLabel")
