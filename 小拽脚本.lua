@@ -1,4 +1,4 @@
-﻿-- ROBLOX 悬浮窗 UI
+-- ROBLOX 悬浮窗 UI
 -- 现代化设计的游戏开发工具界面
 
 local Players = game:GetService("Players")
