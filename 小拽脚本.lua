@@ -10,8 +10,32 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- 配置保存
+local savedConfig = {
+    flySpeed = 50,
+    walkSpeed = 16
+}
+
+local function saveConfig()
+    pcall(function()
+        writefile("XiaoZhuai_Config.json", HttpService:JSONEncode(savedConfig))
+    end)
+end
+
+local function loadConfig()
+    pcall(function()
+        if isfile("XiaoZhuai_Config.json") then
+            local loaded = HttpService:JSONDecode(readfile("XiaoZhuai_Config.json"))
+            savedConfig.flySpeed = loaded.flySpeed or 50
+            savedConfig.walkSpeed = loaded.walkSpeed or 16
+        end
+    end)
+end
+
+loadConfig()
+
 -- 飞行速度变量
-local flySpeed = 50
+local flySpeed = savedConfig.flySpeed
 
 -- 重置人物状态函数
 local function resetPlayerState()
@@ -60,6 +84,11 @@ end
 
 -- 重置人物状态
 resetPlayerState()
+
+-- 应用保存的速度
+if player.Character and player.Character:FindFirstChild("Humanoid") then
+    player.Character.Humanoid.WalkSpeed = savedConfig.walkSpeed
+end
 
 -- 创建主界面
 local screenGui = Instance.new("ScreenGui")
@@ -441,6 +470,8 @@ flySpeedSetBtn.MouseButton1Click:Connect(function()
     if newSpeed and newSpeed > 0 then
         flySpeed = newSpeed
         flySpeedLabel.Text = "飞行速度: " .. flySpeed
+        savedConfig.flySpeed = flySpeed
+        saveConfig()
     else
         flySpeedInput.Text = tostring(flySpeed)
     end
@@ -714,6 +745,8 @@ for i, speed in ipairs(speedValues) do
     speedBtn.MouseButton1Click:Connect(function()
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = speed
+            savedConfig.walkSpeed = speed
+            saveConfig()
             print("移动速度已设置为: " .. speed)
         end
     end)
@@ -776,6 +809,8 @@ customSpeedSetBtn.MouseButton1Click:Connect(function()
     if speedValue and speedValue > 0 then
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = speedValue
+            savedConfig.walkSpeed = speedValue
+            saveConfig()
             print("自定义移动速度已设置为: " .. speedValue)
         end
     else
@@ -1594,3 +1629,67 @@ buttonFrame.Size = UDim2.new(1, 0, 0, 255)
 createSmallButton("重置功能", Color3.fromRGB(220, 53, 69), "🔄", UDim2.new(0, 87.5, 0, eatWorldY + 90), function()
     resetAllFeatures()
 end)
+
+-- 默认开启功能
+keepUnanchor = true
+boundProtect = true
+autoClaimRewards = true
+autoCollectingCubes = true
+
+-- 自动开启取消锚固
+coroutine.wrap(function()
+    while keepUnanchor do
+        task.wait()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.Anchored = false
+        end
+    end
+end)()
+
+-- 自动开启边界保护
+coroutine.wrap(function()
+    while boundProtect do
+        task.wait()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local root = LocalPlayer.Character.HumanoidRootPart
+            local pos = root.Position
+            if workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Bedrock") then
+                local mapSize = workspace.Map.Bedrock.Size * Vector3.new(1, 0, 1)
+                local clampedPos = Vector3.new(math.clamp(pos.X, -mapSize.X / 2, mapSize.X / 2), pos.Y, math.clamp(pos.Z, -mapSize.Z / 2, mapSize.Z / 2))
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(clampedPos) * root.CFrame.Rotation
+            end
+        end
+    end
+end)()
+
+-- 自动开启自动领
+coroutine.wrap(function()
+    while autoClaimRewards do
+        task.wait(1)
+        if LocalPlayer:FindFirstChild("TimedRewards") then
+            for _, reward in LocalPlayer.TimedRewards:GetChildren() do
+                if reward.Value > 0 then Events.RewardEvent:FireServer(reward) end
+            end
+        end
+        Events.SpinEvent:FireServer()
+    end
+end)()
+
+-- 自动开启自动收
+coroutine.wrap(function()
+    LocalPlayer.PlayerScripts.CubeVis.Enabled = false
+    while autoCollectingCubes do
+        task.wait()
+        local root = getRoot()
+        if root then
+            for _, v in workspace:GetChildren() do
+                if v.Name == "Cube" and v:FindFirstChild("Owner") and (v.Owner.Value == LocalPlayer.Name or v.Owner.Value == "") then
+                    v.CFrame = root.CFrame
+                end
+            end
+        end
+    end
+    LocalPlayer.PlayerScripts.CubeVis.Enabled = true
+end)()
+
+print("✅ 已自动开启：取消锚固、边界保护、自动领、自动收")
