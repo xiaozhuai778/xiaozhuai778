@@ -1487,7 +1487,17 @@ end)
 
 local figureWindow, figureContent = createEatWorldWindow("人物", 300, 250)
 
-createEatToggle(figureContent, "取消锚固", function(enabled) keepUnanchor = enabled coroutine.wrap(function() while keepUnanchor do task.wait() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then LocalPlayer.Character.HumanoidRootPart.Anchored = false end end end)() end, true)
+createEatToggle(figureContent, "取消锚固", function(enabled)
+    keepUnanchor = enabled
+    coroutine.wrap(function()
+        while keepUnanchor do
+            task.wait()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                LocalPlayer.Character.HumanoidRootPart.Anchored = false
+            end
+        end
+    end)()
+end)
 
 createEatToggle(figureContent, "边界保护", function(enabled)
     boundProtect = enabled
@@ -1754,4 +1764,3 @@ for _, plr in Players:GetPlayers() do
 end
 
 Players.PlayerAdded:Connect(createPlayerOverhead)
-
