@@ -11,10 +11,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- 配置保存
-local savedConfig = {
-    flySpeed = 50,
-    walkSpeed = 16
-}
+local savedConfig = {`n    flySpeed = 50,`n    walkSpeed = 16,`n    mainColor = Color3.fromRGB(25, 25, 35)`n}
 
 local function saveConfig()
     pcall(function()
@@ -905,11 +902,7 @@ for i, colorData in ipairs(colors) do
     colorBtnCorner.Parent = colorBtn
     
     colorBtn.MouseButton1Click:Connect(function()
-        mainFrame.BackgroundColor3 = colorData[1]
-        titleBar.BackgroundColor3 = Color3.new(colorData[1].R * 0.8, colorData[1].G * 0.8, colorData[1].B * 0.8)
-        infoFrame.BackgroundColor3 = Color3.new(colorData[1].R * 0.6, colorData[1].G * 0.6, colorData[1].B * 0.6)
-        lightBorder.Color = colorData[1]
-        print("颜色已更改为: " .. colorData[2])
+        mainFrame.BackgroundColor3 = colorData[1]`n        titleBar.BackgroundColor3 = Color3.new(colorData[1].R * 0.8, colorData[1].G * 0.8, colorData[1].B * 0.8)`n        infoFrame.BackgroundColor3 = Color3.new(colorData[1].R * 0.6, colorData[1].G * 0.6, colorData[1].B * 0.6)`n        lightBorder.Color = colorData[1]`n        savedConfig.mainColor = colorData[1]`n        saveConfig()`n        print("颜色已更改为: " .. colorData[2])
     end)
 end
 
@@ -1200,7 +1193,7 @@ local function createEatWorldWindow(title, width, height)
     return popup, content
 end
 
-local function createEatToggle(parent, text, callback)
+local function createEatToggle(parent, text, callback, defaultEnabled)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 0, 40)
     frame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
@@ -1238,7 +1231,7 @@ local function createEatToggle(parent, text, callback)
     local indicatorCorner = Instance.new("UICorner")
     indicatorCorner.CornerRadius = UDim.new(1, 0)
     indicatorCorner.Parent = indicator
-    local enabled = false
+    local enabled = defaultEnabled or false`n    if enabled then`n        toggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)`n        indicator.Position = UDim2.new(1, -22, 0.5, -9.5)`n    end
     toggle.MouseButton1Click:Connect(function()
         enabled = not enabled
         if enabled then
