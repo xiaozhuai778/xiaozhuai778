@@ -233,6 +233,18 @@ titleLabel.TextScaled = true
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.Parent = titleBar
 
+-- 玩家名字显示（标题栏左侧）
+local playerNameLabel = Instance.new("TextLabel")
+playerNameLabel.Size = UDim2.new(0, 90, 1, 0)
+playerNameLabel.Position = UDim2.new(0, 5, 0, 0)
+playerNameLabel.BackgroundTransparency = 1
+playerNameLabel.Text = player.Name
+playerNameLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+playerNameLabel.TextSize = 12
+playerNameLabel.Font = Enum.Font.GothamBold
+playerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+playerNameLabel.Parent = titleBar
+
 -- 缩小时的FPS显示（右边）
 local minimizedFPS = Instance.new("TextLabel")
 minimizedFPS.Size = UDim2.new(0, 60, 1, 0)
