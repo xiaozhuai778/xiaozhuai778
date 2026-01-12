@@ -202,25 +202,31 @@ titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = titleBar
 
 -- 标题栏拖动
-local dragging = false
-local dragStart = nil
-local startPos = nil
+local mainDragging = false
+local mainDragStart = nil
+local mainStartPos = nil
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+        mainDragging = true
+        mainDragStart = input.Position
+        mainStartPos = mainFrame.Position
+        bringToFront(mainFrame)
+    end
+end)
+titleBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mainDragging = false
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    if mainDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - mainDragStart
+        mainFrame.Position = UDim2.new(mainStartPos.X.Scale, mainStartPos.X.Offset + delta.X, mainStartPos.Y.Scale, mainStartPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mainDragging = false
     end
 end)
 
