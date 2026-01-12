@@ -13,11 +13,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- 配置保存
 local savedConfig = {
     flySpeed = 50,
-    walkSpeed = 16,
-    mainFrameColor = {25, 25, 35},
-    titleBarColor = {45, 45, 65},
-    infoFrameColor = {35, 35, 50},
-    borderColor = {255, 0, 0}
+    walkSpeed = 16
 }
 
 local function saveConfig()
@@ -83,46 +79,8 @@ for _, gui in pairs(playerGui:GetChildren()) do
     end
 end
 
--- 重置人物状态（但不重置速度）
-if player.Character then
-    local character = player.Character
-    local humanoid = character:FindFirstChild("Humanoid")
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    
-    if humanoid then
-        humanoid.JumpPower = 50
-        humanoid.PlatformStand = false
-    end
-    
-    if rootPart then
-        for _, obj in pairs(rootPart:GetChildren()) do
-            if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
-                obj:Destroy()
-            end
-        end
-    end
-    
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            for _, obj in pairs(part:GetChildren()) do
-                if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
-                    obj:Destroy()
-                end
-            end
-        end
-    end
-end
-
--- 应用保存的配置
-if player.Character and player.Character:FindFirstChild("Humanoid") then
-    player.Character.Humanoid.WalkSpeed = savedConfig.walkSpeed
-    print("✅ 已应用保存的速度: " .. savedConfig.walkSpeed)
-end
-
-player.CharacterAdded:Connect(function(character)
-    character:WaitForChild("Humanoid").WalkSpeed = savedConfig.walkSpeed
-    print("✅ 角色重生，已应用保存的速度: " .. savedConfig.walkSpeed)
-end)
+-- 重置人物状态
+resetPlayerState()
 
 -- 创建主界面
 local screenGui = Instance.new("ScreenGui")
@@ -203,7 +161,7 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 350, 0, 450)
 mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
-mainFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.mainFrameColor[1], savedConfig.mainFrameColor[2], savedConfig.mainFrameColor[3])
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
@@ -223,7 +181,7 @@ corner.Parent = mainFrame
 
 -- 流动光带边框
 local lightBorder = Instance.new("UIStroke")
-lightBorder.Color = Color3.fromRGB(savedConfig.borderColor[1], savedConfig.borderColor[2], savedConfig.borderColor[3])
+lightBorder.Color = Color3.fromRGB(255, 0, 0)
 lightBorder.Thickness = 3
 lightBorder.Parent = mainFrame
 
@@ -235,7 +193,7 @@ local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundColor3 = Color3.fromRGB(savedConfig.titleBarColor[1], savedConfig.titleBarColor[2], savedConfig.titleBarColor[3])
+titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
@@ -326,7 +284,7 @@ local infoFrame = Instance.new("Frame")
 infoFrame.Name = "InfoFrame"
 infoFrame.Size = UDim2.new(1, 0, 0, 150)
 infoFrame.Position = UDim2.new(0, 0, 0, 0)
-infoFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.infoFrameColor[1], savedConfig.infoFrameColor[2], savedConfig.infoFrameColor[3])
+infoFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
 infoFrame.BorderSizePixel = 0
 infoFrame.Parent = contentFrame
 
@@ -780,8 +738,6 @@ for i, speed in ipairs(speedValues) do
     speedBtn.MouseButton1Click:Connect(function()
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = speed
-            savedConfig.walkSpeed = speed
-            saveConfig()
             print("移动速度已设置为: " .. speed)
         end
     end)
@@ -844,8 +800,6 @@ customSpeedSetBtn.MouseButton1Click:Connect(function()
     if speedValue and speedValue > 0 then
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = speedValue
-            savedConfig.walkSpeed = speedValue
-            saveConfig()
             print("自定义移动速度已设置为: " .. speedValue)
         end
     else
@@ -944,11 +898,6 @@ for i, colorData in ipairs(colors) do
         titleBar.BackgroundColor3 = Color3.new(colorData[1].R * 0.8, colorData[1].G * 0.8, colorData[1].B * 0.8)
         infoFrame.BackgroundColor3 = Color3.new(colorData[1].R * 0.6, colorData[1].G * 0.6, colorData[1].B * 0.6)
         lightBorder.Color = colorData[1]
-        savedConfig.mainFrameColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
-        savedConfig.titleBarColor = {math.floor(colorData[1].R * 0.8 * 255), math.floor(colorData[1].G * 0.8 * 255), math.floor(colorData[1].B * 0.8 * 255)}
-        savedConfig.infoFrameColor = {math.floor(colorData[1].R * 0.6 * 255), math.floor(colorData[1].G * 0.6 * 255), math.floor(colorData[1].B * 0.6 * 255)}
-        savedConfig.borderColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
-        saveConfig()
         print("颜色已更改为: " .. colorData[2])
     end)
 end
