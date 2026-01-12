@@ -1,89 +1,1321 @@
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- ROBLOX 悬浮窗 UI
+-- 现代化设计的游戏开发工具界面
 
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- 配置保存
+local savedConfig = {
+    flySpeed = 50,
+    walkSpeed = 16,
+    mainFrameColor = {25, 25, 35},
+    titleBarColor = {45, 45, 65},
+    infoFrameColor = {35, 35, 50},
+    borderColor = {255, 0, 0}
+}
+
+local function saveConfig()
+    pcall(function()
+        writefile("XiaoZhuaiScript_Config.json", HttpService:JSONEncode(savedConfig))
+        print("✅ 配置已保存")
+    end)
+end
+
+local function loadConfig()
+    pcall(function()
+        if isfile("XiaoZhuaiScript_Config.json") then
+            savedConfig = HttpService:JSONDecode(readfile("XiaoZhuaiScript_Config.json"))
+            print("✅ 配置已加载")
+        end
+    end)
+end
+
+loadConfig()
+
+-- 重置人物状态函数
+local function resetPlayerState()
+    if player.Character then
+        local character = player.Character
+        local humanoid = character:FindFirstChild("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        
+        -- 重置移动速度
+        if humanoid then
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+            humanoid.PlatformStand = false
+        end
+        
+        -- 清除所有飞行相关的BodyVelocity和BodyAngularVelocity
+        if rootPart then
+            for _, obj in pairs(rootPart:GetChildren()) do
+                if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                    obj:Destroy()
+                end
+            end
+        end
+        
+        -- 清除其他可能的修改
+        for _, part in pairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                for _, obj in pairs(part:GetChildren()) do
+                    if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+        
+        print("人物状态已重置")
+    end
+end
+
+-- 删除之前的悬浮窗实例并重置状态
+for _, gui in pairs(playerGui:GetChildren()) do
+    if gui.Name == "FloatingUI" then
+        gui:Destroy()
+    end
+end
+
+-- 重置人物状态（但不重置速度）
+if player.Character then
+    local character = player.Character
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid then
+        humanoid.JumpPower = 50
+        humanoid.PlatformStand = false
+    end
+    
+    if rootPart then
+        for _, obj in pairs(rootPart:GetChildren()) do
+            if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                obj:Destroy()
+            end
+        end
+    end
+    
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            for _, obj in pairs(part:GetChildren()) do
+                if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- 应用保存的配置
+if player.Character and player.Character:FindFirstChild("Humanoid") then
+    player.Character.Humanoid.WalkSpeed = savedConfig.walkSpeed
+    print("✅ 已应用保存的速度: " .. savedConfig.walkSpeed)
+end
+
+player.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid").WalkSpeed = savedConfig.walkSpeed
+    print("✅ 角色重生，已应用保存的速度: " .. savedConfig.walkSpeed)
+end)
+
+-- 创建主界面
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FloatingUI"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+screenGui.Parent = playerGui
+
+-- 窗口层级管理
+local currentZIndex = 1
+local function bringToFront(frame)
+    currentZIndex = currentZIndex + 1
+    frame.ZIndex = currentZIndex
+    for _, child in pairs(frame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.ZIndex = currentZIndex
+        end
+    end
+end
+
+-- 创建缩放手柄函数
+local function createResizeHandle(frame)
+    local resizeHandle = Instance.new("TextButton")
+    resizeHandle.Size = UDim2.new(0, 20, 0, 20)
+    resizeHandle.Position = UDim2.new(1, -20, 1, -20)
+    resizeHandle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    resizeHandle.Text = "⟲"
+    resizeHandle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    resizeHandle.TextSize = 12
+    resizeHandle.Font = Enum.Font.GothamBold
+    resizeHandle.BorderSizePixel = 0
+    resizeHandle.Active = false
+    resizeHandle.Parent = frame
+    
+    local resizeCorner = Instance.new("UICorner")
+    resizeCorner.CornerRadius = UDim.new(0, 3)
+    resizeCorner.Parent = resizeHandle
+    
+    local dragging = false
+    local startSize = frame.Size
+    local startPos = Vector2.new(0, 0)
+    
+    resizeHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            startSize = frame.Size
+            startPos = Vector2.new(input.Position.X, input.Position.Y)
+            bringToFront(frame)
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local currentPos = Vector2.new(input.Position.X, input.Position.Y)
+            local delta = currentPos - startPos
+            
+            local newWidth = math.max(200, startSize.X.Offset + delta.X)
+            local newHeight = math.max(150, startSize.Y.Offset + delta.Y)
+            
+            frame.Size = UDim2.new(0, newWidth, 0, newHeight)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+-- 主窗口框架
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 350, 0, 450)
+mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
+mainFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.mainFrameColor[1], savedConfig.mainFrameColor[2], savedConfig.mainFrameColor[3])
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- 主窗口点击置顶
+mainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        bringToFront(mainFrame)
+    end
+end)
+
+-- 添加圆角和光带效果（去掉灰色阴影）
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+-- 流动光带边框
+local lightBorder = Instance.new("UIStroke")
+lightBorder.Color = Color3.fromRGB(savedConfig.borderColor[1], savedConfig.borderColor[2], savedConfig.borderColor[3])
+lightBorder.Thickness = 3
+lightBorder.Parent = mainFrame
+
+-- 主窗口缩放手柄
+createResizeHandle(mainFrame)
+
+-- 标题栏
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundColor3 = Color3.fromRGB(savedConfig.titleBarColor[1], savedConfig.titleBarColor[2], savedConfig.titleBarColor[3])
+titleBar.BorderSizePixel = 0
+titleBar.Parent = mainFrame
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 12)
+titleCorner.Parent = titleBar
+
+-- 缩小时的当前时间显示（左边）
+local minimizedTime = Instance.new("TextLabel")
+minimizedTime.Size = UDim2.new(0, 60, 1, 0)
+minimizedTime.Position = UDim2.new(0, 10, 0, 0)
+minimizedTime.BackgroundTransparency = 1
+minimizedTime.Text = "12:00"
+minimizedTime.TextColor3 = Color3.fromRGB(255, 200, 100)
+minimizedTime.TextSize = 12
+minimizedTime.Font = Enum.Font.GothamBold
+minimizedTime.Visible = false
+minimizedTime.Parent = titleBar
+
+-- 标题文本（居中）
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Name = "TitleLabel"
+titleLabel.Size = UDim2.new(1, -200, 1, 0)
+titleLabel.Position = UDim2.new(0, 100, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "小拽脚本"
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextScaled = true
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.Parent = titleBar
+
+-- 缩小时的FPS显示（右边）
+local minimizedFPS = Instance.new("TextLabel")
+minimizedFPS.Size = UDim2.new(0, 60, 1, 0)
+minimizedFPS.Position = UDim2.new(1, -130, 0, 0)
+minimizedFPS.BackgroundTransparency = 1
+minimizedFPS.Text = "60 FPS"
+minimizedFPS.TextColor3 = Color3.fromRGB(100, 255, 100)
+minimizedFPS.TextSize = 12
+minimizedFPS.Font = Enum.Font.GothamBold
+minimizedFPS.Visible = false
+minimizedFPS.Parent = titleBar
+
+-- 最小化按钮
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeButton"
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+minimizeBtn.Text = "—"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.TextScaled = true
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.BorderSizePixel = 0
+minimizeBtn.Parent = titleBar
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.CornerRadius = UDim.new(0.5, 0)
+minimizeCorner.Parent = minimizeBtn
+
+-- 关闭按钮
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "CloseButton"
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.TextScaled = true
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = titleBar
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.CornerRadius = UDim.new(0, 6)
+closeCorner.Parent = closeBtn
+
+-- 内容区域
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Size = UDim2.new(1, -20, 1, -60)
+contentFrame.Position = UDim2.new(0, 10, 0, 50)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Parent = mainFrame
+
+-- 游戏信息区域（上半部分）
+local infoFrame = Instance.new("Frame")
+infoFrame.Name = "InfoFrame"
+infoFrame.Size = UDim2.new(1, 0, 0, 150)
+infoFrame.Position = UDim2.new(0, 0, 0, 0)
+infoFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.infoFrameColor[1], savedConfig.infoFrameColor[2], savedConfig.infoFrameColor[3])
+infoFrame.BorderSizePixel = 0
+infoFrame.Parent = contentFrame
+
+local infoCorner = Instance.new("UICorner")
+infoCorner.CornerRadius = UDim.new(0, 8)
+infoCorner.Parent = infoFrame
+
+-- 信息标题
+local infoTitle = Instance.new("TextLabel")
+infoTitle.Name = "InfoTitle"
+infoTitle.Size = UDim2.new(1, -20, 0, 25)
+infoTitle.Position = UDim2.new(0, 10, 0, 5)
+infoTitle.BackgroundTransparency = 1
+infoTitle.Text = "📊 游戏信息"
+infoTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoTitle.TextScaled = true
+infoTitle.Font = Enum.Font.GothamBold
+infoTitle.Parent = infoFrame
+
+-- 玩家信息
+local playerInfo = Instance.new("TextLabel")
+playerInfo.Name = "PlayerInfo"
+playerInfo.Size = UDim2.new(1, -20, 0, 25)
+playerInfo.Position = UDim2.new(0, 10, 0, 30)
+playerInfo.BackgroundTransparency = 1
+playerInfo.Text = "玩家: " .. player.Name
+playerInfo.TextColor3 = Color3.fromRGB(200, 200, 200)
+playerInfo.TextScaled = true
+playerInfo.Font = Enum.Font.Gotham
+playerInfo.TextXAlignment = Enum.TextXAlignment.Left
+playerInfo.Parent = infoFrame
+
+-- FPS显示
+local fpsLabel = Instance.new("TextLabel")
+fpsLabel.Name = "FPSLabel"
+fpsLabel.Size = UDim2.new(1, -20, 0, 25)
+fpsLabel.Position = UDim2.new(0, 10, 0, 55)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Text = "帧率: 60 FPS"
+fpsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+fpsLabel.TextScaled = true
+fpsLabel.Font = Enum.Font.Gotham
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+fpsLabel.Parent = infoFrame
+
+-- 移动速度显示
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(1, -20, 0, 25)
+speedLabel.Position = UDim2.new(0, 10, 0, 80)
+speedLabel.BackgroundTransparency = 1
+speedLabel.Text = "速度: 16"
+speedLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+speedLabel.TextScaled = true
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedLabel.Parent = infoFrame
+
+-- 当前时间显示
+local currentTimeLabel = Instance.new("TextLabel")
+currentTimeLabel.Size = UDim2.new(1, -20, 0, 25)
+currentTimeLabel.Position = UDim2.new(0, 10, 0, 105)
+currentTimeLabel.BackgroundTransparency = 1
+currentTimeLabel.Text = "时间: 12:00:00"
+currentTimeLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+currentTimeLabel.TextScaled = true
+currentTimeLabel.Font = Enum.Font.Gotham
+currentTimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+currentTimeLabel.Parent = infoFrame
+
+-- 功能按钮区域（下半部分，两列布局）
+local buttonFrame = Instance.new("Frame")
+buttonFrame.Name = "ButtonFrame"
+buttonFrame.Size = UDim2.new(1, 0, 0, 120)
+buttonFrame.Position = UDim2.new(0, 0, 0, 160)
+buttonFrame.BackgroundTransparency = 1
+buttonFrame.Parent = contentFrame
+
+-- 飞行变量
+local flying = false
+local bodyVelocity = nil
+local bodyAngularVelocity = nil
+local flySpeed = savedConfig.flySpeed or 50
+
+-- 飞行功能
+local function toggleFly()
+    flying = not flying
+    
+    if flying then
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local rootPart = player.Character.HumanoidRootPart
+            
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.Parent = rootPart
+            
+            bodyAngularVelocity = Instance.new("BodyAngularVelocity")
+            bodyAngularVelocity.MaxTorque = Vector3.new(0, math.huge, 0)
+            bodyAngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
+            bodyAngularVelocity.Parent = rootPart
+            
+            print("飞行模式已开启")
+        end
+    else
+        if bodyVelocity then 
+            bodyVelocity:Destroy() 
+            bodyVelocity = nil
+        end
+        if bodyAngularVelocity then
+            bodyAngularVelocity:Destroy()
+            bodyAngularVelocity = nil
+        end
+        print("飞行模式已关闭")
+    end
+end
+
+-- 屏幕左侧飞行控制按钮（可拖动，不可缩放）
+local leftControlFrame = Instance.new("Frame")
+leftControlFrame.Size = UDim2.new(0, 200, 0, 230)
+leftControlFrame.Position = UDim2.new(0, 10, 0.5, -115)
+leftControlFrame.BackgroundTransparency = 1
+leftControlFrame.Visible = false
+leftControlFrame.Active = true
+leftControlFrame.Draggable = true
+leftControlFrame.Parent = screenGui
+
+-- 飞行控制窗口点击置顶
+leftControlFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        bringToFront(leftControlFrame)
+    end
+end)
+
+-- 飞行速度标签
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Size = UDim2.new(1, 0, 0, 20)
+flySpeedLabel.Position = UDim2.new(0, 0, 0, 0)
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Text = "飞行速度: " .. flySpeed
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.TextSize = 12
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.Parent = leftControlFrame
+
+-- 飞行速度输入框
+local flySpeedInput = Instance.new("TextBox")
+flySpeedInput.Size = UDim2.new(0, 80, 0, 25)
+flySpeedInput.Position = UDim2.new(0, 10, 0, 20)
+flySpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+flySpeedInput.Text = tostring(flySpeed)
+flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedInput.TextSize = 12
+flySpeedInput.Font = Enum.Font.Gotham
+flySpeedInput.BorderSizePixel = 0
+flySpeedInput.Parent = leftControlFrame
+local flySpeedInputCorner = Instance.new("UICorner")
+flySpeedInputCorner.CornerRadius = UDim.new(0, 4)
+flySpeedInputCorner.Parent = flySpeedInput
+
+local flySpeedSetBtn = Instance.new("TextButton")
+flySpeedSetBtn.Size = UDim2.new(0, 60, 0, 25)
+flySpeedSetBtn.Position = UDim2.new(0, 100, 0, 20)
+flySpeedSetBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+flySpeedSetBtn.Text = "设置"
+flySpeedSetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedSetBtn.TextSize = 12
+flySpeedSetBtn.Font = Enum.Font.GothamBold
+flySpeedSetBtn.BorderSizePixel = 0
+flySpeedSetBtn.Parent = leftControlFrame
+local flySpeedSetBtnCorner = Instance.new("UICorner")
+flySpeedSetBtnCorner.CornerRadius = UDim.new(0, 4)
+flySpeedSetBtnCorner.Parent = flySpeedSetBtn
+
+flySpeedSetBtn.MouseButton1Click:Connect(function()
+    local newSpeed = tonumber(flySpeedInput.Text)
+    if newSpeed and newSpeed > 0 then
+        flySpeed = newSpeed
+        flySpeedLabel.Text = "飞行速度: " .. flySpeed
+        savedConfig.flySpeed = flySpeed
+        saveConfig()
+    else
+        flySpeedInput.Text = tostring(flySpeed)
+    end
+end)
+
+-- 开启/关闭飞天按钮（最上方中央）
+local toggleFlyBtn = Instance.new("TextButton")
+toggleFlyBtn.Size = UDim2.new(0, 120, 0, 35)
+toggleFlyBtn.Position = UDim2.new(0, 40, 0, 50)
+toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
+toggleFlyBtn.Text = "开启飞天"
+toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+toggleFlyBtn.TextSize = 14
+toggleFlyBtn.Font = Enum.Font.GothamBold
+toggleFlyBtn.BorderSizePixel = 0
+toggleFlyBtn.Parent = leftControlFrame
+
+local toggleFlyCorner = Instance.new("UICorner")
+toggleFlyCorner.CornerRadius = UDim.new(0, 8)
+toggleFlyCorner.Parent = toggleFlyBtn
+
+-- 上下控制（左边）
+local upBtn = Instance.new("TextButton")
+upBtn.Size = UDim2.new(0, 80, 0, 40)
+upBtn.Position = UDim2.new(0, 0, 0, 95)
+upBtn.BackgroundColor3 = Color3.fromRGB(0, 123, 255)
+upBtn.Text = "上升\n(空格)"
+upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+upBtn.TextSize = 12
+upBtn.Font = Enum.Font.GothamBold
+upBtn.BorderSizePixel = 0
+upBtn.Parent = leftControlFrame
+
+local upCorner = Instance.new("UICorner")
+upCorner.CornerRadius = UDim.new(0, 8)
+upCorner.Parent = upBtn
+
+local downBtn = Instance.new("TextButton")
+downBtn.Size = UDim2.new(0, 80, 0, 40)
+downBtn.Position = UDim2.new(0, 0, 0, 145)
+downBtn.BackgroundColor3 = Color3.fromRGB(0, 123, 255)
+downBtn.Text = "下降\n(C键)"
+downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+downBtn.TextSize = 12
+downBtn.Font = Enum.Font.GothamBold
+downBtn.BorderSizePixel = 0
+downBtn.Parent = leftControlFrame
+
+local downCorner = Instance.new("UICorner")
+downCorner.CornerRadius = UDim.new(0, 8)
+downCorner.Parent = downBtn
+
+-- 前后控制（右边）
+local forwardBtn = Instance.new("TextButton")
+forwardBtn.Size = UDim2.new(0, 80, 0, 40)
+forwardBtn.Position = UDim2.new(0, 100, 0, 95)
+forwardBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+forwardBtn.Text = "前进\n(W键)"
+forwardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+forwardBtn.TextSize = 12
+forwardBtn.Font = Enum.Font.GothamBold
+forwardBtn.BorderSizePixel = 0
+forwardBtn.Parent = leftControlFrame
+
+local forwardCorner = Instance.new("UICorner")
+forwardCorner.CornerRadius = UDim.new(0, 8)
+forwardCorner.Parent = forwardBtn
+
+local backwardBtn = Instance.new("TextButton")
+backwardBtn.Size = UDim2.new(0, 80, 0, 40)
+backwardBtn.Position = UDim2.new(0, 100, 0, 145)
+backwardBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+backwardBtn.Text = "后退\n(S键)"
+backwardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+backwardBtn.TextSize = 12
+backwardBtn.Font = Enum.Font.GothamBold
+backwardBtn.BorderSizePixel = 0
+backwardBtn.Parent = leftControlFrame
+
+local backwardCorner = Instance.new("UICorner")
+backwardCorner.CornerRadius = UDim.new(0, 8)
+backwardCorner.Parent = backwardBtn
+
+-- 持续性飞行控制
+local flyingUp = false
+local flyingDown = false
+local flyingForward = false
+local flyingBackward = false
+
+-- 开启/关闭飞天按钮
+toggleFlyBtn.MouseButton1Click:Connect(function()
+    toggleFly()
+    if flying then
+        toggleFlyBtn.Text = "关闭飞天"
+        toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+        toggleFlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        toggleFlyBtn.Text = "开启飞天"
+        toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
+        toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    end
+end)
+
+-- 上升按钮
+upBtn.MouseButton1Down:Connect(function()
+    flyingUp = true
+end)
+upBtn.MouseButton1Up:Connect(function()
+    flyingUp = false
+end)
+
+-- 下降按钮
+downBtn.MouseButton1Down:Connect(function()
+    flyingDown = true
+end)
+downBtn.MouseButton1Up:Connect(function()
+    flyingDown = false
+end)
+
+-- 前进按钮
+forwardBtn.MouseButton1Down:Connect(function()
+    flyingForward = true
+end)
+forwardBtn.MouseButton1Up:Connect(function()
+    flyingForward = false
+end)
+
+-- 后退按钮
+backwardBtn.MouseButton1Down:Connect(function()
+    flyingBackward = true
+end)
+backwardBtn.MouseButton1Up:Connect(function()
+    flyingBackward = false
+end)
+
+-- 飞行控制循环
+local function flyControl()
+    if not flying or not bodyVelocity then return end
+    
+    local character = player.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local camera = workspace.CurrentCamera
+    local moveVector = Vector3.new(0, 0, 0)
+    
+    -- 按钮控制
+    if flyingUp then
+        moveVector = moveVector + Vector3.new(0, 1, 0)
+    end
+    if flyingDown then
+        moveVector = moveVector - Vector3.new(0, 1, 0)
+    end
+    if flyingForward then
+        moveVector = moveVector + camera.CFrame.LookVector
+    end
+    if flyingBackward then
+        moveVector = moveVector - camera.CFrame.LookVector
+    end
+    
+    -- 键盘控制（电脑专用）
+    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+        moveVector = moveVector + Vector3.new(0, 1, 0)
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.C) then
+        moveVector = moveVector - Vector3.new(0, 1, 0)
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+        moveVector = moveVector + camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+        moveVector = moveVector - camera.CFrame.LookVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+        moveVector = moveVector - camera.CFrame.RightVector
+    end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+        moveVector = moveVector + camera.CFrame.RightVector
+    end
+    
+    bodyVelocity.Velocity = moveVector * flySpeed
+end
+
+-- 启动飞行控制循环
+RunService.Heartbeat:Connect(flyControl)
+
+-- 移速设置窗口（可拖动，可缩放）
+local speedWindow = Instance.new("Frame")
+speedWindow.Size = UDim2.new(0, 400, 0, 500)
+speedWindow.Position = UDim2.new(0, 370, 0, 20)
+speedWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+speedWindow.BorderSizePixel = 0
+speedWindow.Visible = false
+speedWindow.Active = true
+speedWindow.Draggable = true
+speedWindow.Parent = screenGui
+
+-- 移速窗口点击置顶
+speedWindow.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        bringToFront(speedWindow)
+    end
+end)
+
+local speedWindowCorner = Instance.new("UICorner")
+speedWindowCorner.CornerRadius = UDim.new(0, 10)
+speedWindowCorner.Parent = speedWindow
+
+local speedWindowBorder = Instance.new("UIStroke")
+speedWindowBorder.Color = Color3.fromRGB(220, 53, 69)
+speedWindowBorder.Thickness = 2
+speedWindowBorder.Parent = speedWindow
+
+-- 移速窗口缩放手柄
+createResizeHandle(speedWindow)
+
+local speedTitle = Instance.new("TextLabel")
+speedTitle.Size = UDim2.new(1, -25, 0, 30)
+speedTitle.Position = UDim2.new(0, 5, 0, 5)
+speedTitle.BackgroundTransparency = 1
+speedTitle.Text = "⚡ 移动速度设置"
+speedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTitle.TextSize = 14
+speedTitle.Font = Enum.Font.GothamBold
+speedTitle.Parent = speedWindow
+
+local speedCloseBtn = Instance.new("TextButton")
+speedCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+speedCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+speedCloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+speedCloseBtn.Text = "×"
+speedCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedCloseBtn.TextSize = 12
+speedCloseBtn.BorderSizePixel = 0
+speedCloseBtn.Parent = speedWindow
+
+local speedCloseBtnCorner = Instance.new("UICorner")
+speedCloseBtnCorner.CornerRadius = UDim.new(0, 3)
+speedCloseBtnCorner.Parent = speedCloseBtn
+
+-- 滚动框
+local speedScrollFrame = Instance.new("ScrollingFrame")
+speedScrollFrame.Size = UDim2.new(1, -20, 1, -80)
+speedScrollFrame.Position = UDim2.new(0, 10, 0, 40)
+speedScrollFrame.BackgroundTransparency = 1
+speedScrollFrame.ScrollBarThickness = 8
+speedScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 1200)
+speedScrollFrame.Parent = speedWindow
+
+-- 预设速度
+local speedValues = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 2000, 3000, 4000}
+
+for i, speed in ipairs(speedValues) do
+    local speedBtn = Instance.new("TextButton")
+    speedBtn.Size = UDim2.new(0, 180, 0, 35)
+    speedBtn.Position = UDim2.new(0, 10 + ((i-1) % 2) * 190, 0, 10 + math.floor((i-1) / 2) * 45)
+    speedBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+    speedBtn.Text = "速度: " .. speed
+    speedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    speedBtn.TextSize = 12
+    speedBtn.Font = Enum.Font.Gotham
+    speedBtn.BorderSizePixel = 0
+    speedBtn.Parent = speedScrollFrame
+    
+    local speedBtnCorner = Instance.new("UICorner")
+    speedBtnCorner.CornerRadius = UDim.new(0, 5)
+    speedBtnCorner.Parent = speedBtn
+    
+    speedBtn.MouseButton1Click:Connect(function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = speed
+            savedConfig.walkSpeed = speed
+            saveConfig()
+            print("移动速度已设置为: " .. speed)
+        end
+    end)
+end
+
+-- 自定义移速区域
+local customSpeedFrame = Instance.new("Frame")
+customSpeedFrame.Size = UDim2.new(1, -20, 0, 80)
+customSpeedFrame.Position = UDim2.new(0, 10, 0, 470)
+customSpeedFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+customSpeedFrame.BorderSizePixel = 0
+customSpeedFrame.Parent = speedScrollFrame
+
+local customSpeedCorner = Instance.new("UICorner")
+customSpeedCorner.CornerRadius = UDim.new(0, 8)
+customSpeedCorner.Parent = customSpeedFrame
+
+local customSpeedLabel = Instance.new("TextLabel")
+customSpeedLabel.Size = UDim2.new(1, 0, 0, 25)
+customSpeedLabel.Position = UDim2.new(0, 0, 0, 5)
+customSpeedLabel.BackgroundTransparency = 1
+customSpeedLabel.Text = "自定义移速"
+customSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+customSpeedLabel.TextSize = 14
+customSpeedLabel.Font = Enum.Font.GothamBold
+customSpeedLabel.Parent = customSpeedFrame
+
+local customSpeedInput = Instance.new("TextBox")
+customSpeedInput.Size = UDim2.new(0, 200, 0, 30)
+customSpeedInput.Position = UDim2.new(0, 10, 0, 30)
+customSpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+customSpeedInput.Text = "输入速度值"
+customSpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+customSpeedInput.TextSize = 12
+customSpeedInput.Font = Enum.Font.Gotham
+customSpeedInput.BorderSizePixel = 0
+customSpeedInput.Parent = customSpeedFrame
+
+local customSpeedInputCorner = Instance.new("UICorner")
+customSpeedInputCorner.CornerRadius = UDim.new(0, 5)
+customSpeedInputCorner.Parent = customSpeedInput
+
+local customSpeedSetBtn = Instance.new("TextButton")
+customSpeedSetBtn.Size = UDim2.new(0, 80, 0, 30)
+customSpeedSetBtn.Position = UDim2.new(0, 220, 0, 30)
+customSpeedSetBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+customSpeedSetBtn.Text = "设置"
+customSpeedSetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+customSpeedSetBtn.TextSize = 12
+customSpeedSetBtn.Font = Enum.Font.GothamBold
+customSpeedSetBtn.BorderSizePixel = 0
+customSpeedSetBtn.Parent = customSpeedFrame
+
+local customSpeedSetBtnCorner = Instance.new("UICorner")
+customSpeedSetBtnCorner.CornerRadius = UDim.new(0, 5)
+customSpeedSetBtnCorner.Parent = customSpeedSetBtn
+
+customSpeedSetBtn.MouseButton1Click:Connect(function()
+    local speedValue = tonumber(customSpeedInput.Text)
+    if speedValue and speedValue > 0 then
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = speedValue
+            savedConfig.walkSpeed = speedValue
+            saveConfig()
+            print("自定义移动速度已设置为: " .. speedValue)
+        end
+    else
+        print("请输入有效的数字")
+    end
+end)
+
+-- 颜色选择窗口（可拖动，可缩放）
+local colorWindow = Instance.new("Frame")
+colorWindow.Size = UDim2.new(0, 320, 0, 300)
+colorWindow.Position = UDim2.new(0, 370, 0, 20)
+colorWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+colorWindow.BorderSizePixel = 0
+colorWindow.Visible = false
+colorWindow.Active = true
+colorWindow.Draggable = true
+colorWindow.Parent = screenGui
+
+-- 颜色窗口点击置顶
+colorWindow.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        bringToFront(colorWindow)
+    end
+end)
+
+local colorWindowCorner = Instance.new("UICorner")
+colorWindowCorner.CornerRadius = UDim.new(0, 10)
+colorWindowCorner.Parent = colorWindow
+
+local colorWindowBorder = Instance.new("UIStroke")
+colorWindowBorder.Color = Color3.fromRGB(138, 43, 226)
+colorWindowBorder.Thickness = 2
+colorWindowBorder.Parent = colorWindow
+
+-- 颜色窗口缩放手柄
+createResizeHandle(colorWindow)
+
+local colorTitle = Instance.new("TextLabel")
+colorTitle.Size = UDim2.new(1, -25, 0, 30)
+colorTitle.Position = UDim2.new(0, 5, 0, 5)
+colorTitle.BackgroundTransparency = 1
+colorTitle.Text = "🎨 自定义悬浮窗颜色"
+colorTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+colorTitle.TextSize = 14
+colorTitle.Font = Enum.Font.GothamBold
+colorTitle.Parent = colorWindow
+
+local colorCloseBtn = Instance.new("TextButton")
+colorCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+colorCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+colorCloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+colorCloseBtn.Text = "×"
+colorCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+colorCloseBtn.TextSize = 12
+colorCloseBtn.BorderSizePixel = 0
+colorCloseBtn.Parent = colorWindow
+
+local colorCloseBtnCorner = Instance.new("UICorner")
+colorCloseBtnCorner.CornerRadius = UDim.new(0, 3)
+colorCloseBtnCorner.Parent = colorCloseBtn
+
+-- 更多颜色选择
+local colors = {
+    {Color3.fromRGB(100, 200, 255), "天空蓝"},
+    {Color3.fromRGB(255, 100, 100), "樱花红"},
+    {Color3.fromRGB(100, 255, 100), "翡翠绿"},
+    {Color3.fromRGB(255, 200, 100), "夕阳橙"},
+    {Color3.fromRGB(200, 100, 255), "薰衣紫"},
+    {Color3.fromRGB(255, 255, 100), "柠檬黄"},
+    {Color3.fromRGB(255, 150, 200), "粉玫瑰"},
+    {Color3.fromRGB(150, 255, 200), "薄荷绿"},
+    {Color3.fromRGB(200, 255, 150), "青草绿"},
+    {Color3.fromRGB(255, 200, 150), "蜜桃橙"},
+    {Color3.fromRGB(150, 200, 255), "海洋蓝"},
+    {Color3.fromRGB(255, 150, 255), "梦幻紫"}
+}
+
+for i, colorData in ipairs(colors) do
+    local colorBtn = Instance.new("TextButton")
+    colorBtn.Size = UDim2.new(0, 95, 0, 35)
+    colorBtn.Position = UDim2.new(0, 10 + ((i-1) % 3) * 105, 0, 40 + math.floor((i-1) / 3) * 45)
+    colorBtn.BackgroundColor3 = colorData[1]
+    colorBtn.Text = colorData[2]
+    colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    colorBtn.TextSize = 10
+    colorBtn.Font = Enum.Font.Gotham
+    colorBtn.BorderSizePixel = 0
+    colorBtn.Parent = colorWindow
+    
+    local colorBtnCorner = Instance.new("UICorner")
+    colorBtnCorner.CornerRadius = UDim.new(0, 5)
+    colorBtnCorner.Parent = colorBtn
+    
+    colorBtn.MouseButton1Click:Connect(function()
+        mainFrame.BackgroundColor3 = colorData[1]
+        titleBar.BackgroundColor3 = Color3.new(colorData[1].R * 0.8, colorData[1].G * 0.8, colorData[1].B * 0.8)
+        infoFrame.BackgroundColor3 = Color3.new(colorData[1].R * 0.6, colorData[1].G * 0.6, colorData[1].B * 0.6)
+        lightBorder.Color = colorData[1]
+        savedConfig.mainFrameColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
+        savedConfig.titleBarColor = {math.floor(colorData[1].R * 0.8 * 255), math.floor(colorData[1].G * 0.8 * 255), math.floor(colorData[1].B * 0.8 * 255)}
+        savedConfig.infoFrameColor = {math.floor(colorData[1].R * 0.6 * 255), math.floor(colorData[1].G * 0.6 * 255), math.floor(colorData[1].B * 0.6 * 255)}
+        savedConfig.borderColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
+        saveConfig()
+        print("颜色已更改为: " .. colorData[2])
+    end)
+end
+
+-- 创建两列按钮函数
+local function createSmallButton(text, color, icon, position, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 155, 0, 35)
+    button.Position = position
+    button.BackgroundColor3 = color
+    button.Text = icon .. " " .. text
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 12
+    button.Font = Enum.Font.Gotham
+    button.BorderSizePixel = 0
+    button.Parent = buttonFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = button
+    
+    button.MouseEnter:Connect(function()
+        local tween = TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.new(color.R + 0.1, color.G + 0.1, color.B + 0.1)})
+        tween:Play()
+    end)
+    
+    button.MouseLeave:Connect(function()
+        local tween = TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = color})
+        tween:Play()
+    end)
+    
+    if callback then
+        button.MouseButton1Click:Connect(callback)
+    end
+    
+    return button
+end
+
+-- 创建两列三个按钮
+createSmallButton("飞行模式", Color3.fromRGB(0, 123, 255), "✈️", UDim2.new(0, 5, 0, 5), function()
+    leftControlFrame.Visible = not leftControlFrame.Visible
+end)
+
+createSmallButton("移速设置", Color3.fromRGB(220, 53, 69), "⚡", UDim2.new(0, 170, 0, 5), function()
+    speedWindow.Visible = not speedWindow.Visible
+    colorWindow.Visible = false
+end)
+
+createSmallButton("自定义颜色", Color3.fromRGB(138, 43, 226), "🎨", UDim2.new(0, 87.5, 0, 50), function()
+    colorWindow.Visible = not colorWindow.Visible
+    speedWindow.Visible = false
+end)
+
+-- 功能实现
+local isMinimized = false
+local frameCount = 0
+local lastTime = tick()
+
+-- 光带颜色数组
+local lightColors = {
+    Color3.fromRGB(255, 100, 100),
+    Color3.fromRGB(255, 200, 100),
+    Color3.fromRGB(255, 255, 100),
+    Color3.fromRGB(100, 255, 100),
+    Color3.fromRGB(100, 200, 255),
+    Color3.fromRGB(200, 100, 255),
+}
+
+local colorIndex = 1
+local colorProgress = 0
+
+-- 最小化功能
+minimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and UDim2.new(0, 350, 0, 40) or UDim2.new(0, 350, 0, 450)
+    local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {Size = targetSize})
+    tween:Play()
+    
+    contentFrame.Visible = not isMinimized
+    minimizeBtn.Text = isMinimized and "+" or "—"
+    minimizedFPS.Visible = isMinimized
+    minimizedTime.Visible = isMinimized
+end)
+
+-- 关闭功能
+closeBtn.MouseButton1Click:Connect(function()
+    if flying then 
+        toggleFly()
+        leftControlFrame.Visible = false
+    end
+    -- 关闭时重置人物状态
+    resetPlayerState()
+    local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(0.5, 0, 0.5, 0)
+    })
+    tween:Play()
+    
+    tween.Completed:Connect(function()
+        screenGui:Destroy()
+    end)
+end)
+
+speedCloseBtn.MouseButton1Click:Connect(function()
+    speedWindow.Visible = false
+end)
+
+colorCloseBtn.MouseButton1Click:Connect(function()
+    colorWindow.Visible = false
+end)
+
+-- 实时更新信息和光带流动效果
+RunService.Heartbeat:Connect(function(deltaTime)
+    frameCount = frameCount + 1
+    local currentTime = tick()
+    
+    -- 更新FPS
+    if currentTime - lastTime >= 1 then
+        local fps = math.floor(frameCount / (currentTime - lastTime))
+        fpsLabel.Text = "帧率: " .. fps .. " FPS"
+        minimizedFPS.Text = fps .. " FPS"
+        frameCount = 0
+        lastTime = currentTime
+    end
+    
+    -- 更新移动速度
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local speed = player.Character.Humanoid.WalkSpeed
+        speedLabel.Text = "速度: " .. math.floor(speed)
+    end
+    
+    -- 更新当前时间
+    local realTime = os.date("*t")
+    local timeString = string.format("%02d:%02d:%02d", realTime.hour, realTime.min, realTime.sec)
+    currentTimeLabel.Text = "时间: " .. timeString
+    
+    -- 缩小时显示简化时间
+    local shortTime = string.format("%02d:%02d", realTime.hour, realTime.min)
+    minimizedTime.Text = shortTime
+    
+    -- 光带流动效果
+    colorProgress = colorProgress + deltaTime * 2
+    
+    if colorProgress >= 1 then
+        colorIndex = colorIndex + 1
+        if colorIndex > #lightColors then
+            colorIndex = 1
+        end
+        colorProgress = 0
+    end
+    
+    local currentColor = lightColors[colorIndex]
+    local nextIndex = colorIndex + 1
+    if nextIndex > #lightColors then
+        nextIndex = 1
+    end
+    local nextColor = lightColors[nextIndex]
+    
+    local r = currentColor.R + (nextColor.R - currentColor.R) * colorProgress
+    local g = currentColor.G + (nextColor.G - currentColor.G) * colorProgress
+    local b = currentColor.B + (nextColor.B - currentColor.B) * colorProgress
+    
+    lightBorder.Color = Color3.new(r, g, b)
+end)
+
+-- 添加淡入动画
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+
+local openTween = TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back), {
+    Size = UDim2.new(0, 350, 0, 450),
+    Position = UDim2.new(0.5, -175, 0.5, -225)
+})
+openTween:Play()
+
+print("🎮 小拽脚本已加载完成! - 人物状态已重置")
+
+
+-- ========== 吃吃世界功能 ==========
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local LocalPlayer = Players.LocalPlayer
 
-local UILib = getgenv().UILibCache or loadstring(game:HttpGet("https://raw.githubusercontent.com/bloodball/-back-ups-for-libs/main/wizard"))
-getgenv().UILibCache = UILib
-
-local UI = UILib()
-local window = UI:NewWindow("吃吃世界")
-local main = window:NewSection("自动")
-local upgrades = window:NewSection("升级")
-local figure = window:NewSection("人物")
-local others = window:NewSection("其它")
+local autofarm = false
+local autoCollectingCubes = false
+local autoClaimRewards = false
+local farmMoving = false
+local showMap = false
+local autoeat = false
+local autoUpgradeSize = false
+local autoUpgradeSpd = false
+local autoUpgradeMulti = false
+local autoUpgradeEat = false
+local keepUnanchor = false
+local boundProtect = false
 
 local function getRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
 
-local function randomTp(character)
-    local pos = workspace.Map.Bedrock.Position + Vector3.new(math.random(-workspace.Map.Bedrock.Size.X / 2, workspace.Map.Bedrock.Size.X / 2), 0, math.random(-workspace.Map.Bedrock.Size.X / 2, workspace.Map.Bedrock.Size.X / 2))
-    character:MoveTo(pos)
-    character:PivotTo(CFrame.new(character:GetPivot().Position, workspace.Map.Bedrock.Position))
+local function checkLoaded()
+    return (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("Size") and LocalPlayer.Character:FindFirstChild("Events") and LocalPlayer.Character.Events:FindFirstChild("Grab") and LocalPlayer.Character.Events:FindFirstChild("Eat") and LocalPlayer.Character.Events:FindFirstChild("Sell") and LocalPlayer.Character:FindFirstChild("CurrentChunk")) ~= nil
 end
 
 local function changeMap()
-    local args = {
-    	{
-    		MapTime = -1,
-    		Paused = true
-    	}
-    }
+    local args = {{MapTime = -1, Paused = true}}
     Events.SetServerSettings:FireServer(unpack(args))
 end
 
-local function checkLoaded()
-    return (LocalPlayer.Character
-        and LocalPlayer.Character:FindFirstChild("Humanoid")
-        and LocalPlayer.Character:FindFirstChild("Size")
-        and LocalPlayer.Character:FindFirstChild("Events")
-        and LocalPlayer.Character.Events:FindFirstChild("Grab")
-        and LocalPlayer.Character.Events:FindFirstChild("Eat")
-        and LocalPlayer.Character.Events:FindFirstChild("Sell")
-        and LocalPlayer.Character:FindFirstChild("CurrentChunk")) ~= nil
+local function sizeGrowth(level) return math.floor(((level + 0.5) ^ 2 - 0.25) / 2 * 100) end
+local function speedGrowth(level) return math.floor(level * 2 + 10) end
+local function multiplierGrowth(level) return math.floor(level) end
+local function eatSpeedGrowth(level) return math.floor((1 + (level - 1) * 0.2) * 10) / 10 end
+local function sizePrice(level) return math.floor(level ^ 3 / 2) * 20 end
+local function speedPrice(level) return math.floor((level * 3) ^ 3 / 200) * 1000 end
+local function multiplierPrice(level) return math.floor((level * 10) ^ 3 / 200) * 1000 end
+local function eatSpeedPrice(level) return math.floor((level * 10) ^ 3 / 200) * 2000 end
+
+local function createEatWorldWindow(title, width, height)
+    local popup = Instance.new("Frame")
+    popup.Name = title .. "Window"
+    popup.Size = UDim2.new(0, width, 0, height)
+    popup.Position = UDim2.new(0.5, -width/2, 0.5, -height/2)
+    popup.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    popup.BorderSizePixel = 0
+    popup.Visible = false
+    popup.Active = true
+    popup.Draggable = true
+    popup.Parent = screenGui
+    popup.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then bringToFront(popup) end
+    end)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = popup
+    local border = Instance.new("UIStroke")
+    border.Color = Color3.fromRGB(100, 150, 255)
+    border.Thickness = 2
+    border.Parent = popup
+    createResizeHandle(popup)
+    local titleBar = Instance.new("Frame")
+    titleBar.Size = UDim2.new(1, 0, 0, 35)
+    titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = popup
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleBar
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, -40, 1, 0)
+    titleLabel.Position = UDim2.new(0, 10, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.new(1, 1, 1)
+    titleLabel.TextSize = 16
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Parent = titleBar
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -32, 0, 2.5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "×"
+    closeBtn.TextColor3 = Color3.new(1, 1, 1)
+    closeBtn.TextSize = 18
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.Parent = titleBar
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 6)
+    closeBtnCorner.Parent = closeBtn
+    closeBtn.MouseButton1Click:Connect(function() popup.Visible = false end)
+    local content = Instance.new("ScrollingFrame")
+    content.Name = "Content"
+    content.Size = UDim2.new(1, -20, 1, -50)
+    content.Position = UDim2.new(0, 10, 0, 40)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.ScrollBarThickness = 6
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.Parent = popup
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 8)
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Parent = content
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        content.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    end)
+    return popup, content
 end
 
-local function sizeGrowth(level)
-    return math.floor(((level + 0.5) ^ 2 - 0.25) / 2 * 100)
+local function createEatToggle(parent, text, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -55, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 14
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 45, 0, 25)
+    toggle.Position = UDim2.new(1, -50, 0.5, -12.5)
+    toggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    toggle.BorderSizePixel = 0
+    toggle.Text = ""
+    toggle.Parent = frame
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    local indicator = Instance.new("Frame")
+    indicator.Size = UDim2.new(0, 19, 0, 19)
+    indicator.Position = UDim2.new(0, 3, 0.5, -9.5)
+    indicator.BackgroundColor3 = Color3.new(1, 1, 1)
+    indicator.BorderSizePixel = 0
+    indicator.Parent = toggle
+    local indicatorCorner = Instance.new("UICorner")
+    indicatorCorner.CornerRadius = UDim.new(1, 0)
+    indicatorCorner.Parent = indicator
+    local enabled = false
+    toggle.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        if enabled then
+            toggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+            indicator.Position = UDim2.new(1, -22, 0.5, -9.5)
+        else
+            toggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            indicator.Position = UDim2.new(0, 3, 0.5, -9.5)
+        end
+        callback(enabled)
+    end)
+    return frame
 end
 
-local function speedGrowth(level)
-    return math.floor(level * 2 + 10)
+local function createEatButton(parent, text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 0, 40)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+    button.BorderSizePixel = 0
+    button.Text = text
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextSize = 14
+    button.Font = Enum.Font.Gotham
+    button.Parent = parent
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    button.MouseButton1Click:Connect(callback)
+    button.MouseEnter:Connect(function() button.BackgroundColor3 = Color3.fromRGB(80, 80, 100) end)
+    button.MouseLeave:Connect(function() button.BackgroundColor3 = Color3.fromRGB(60, 60, 80) end)
+    return button
 end
 
-local function multiplierGrowth(level)
-    return math.floor(level)
-end
+local autoWindow, autoContent = createEatWorldWindow("自动", 300, 400)
 
-local function eatSpeedGrowth(level)
-    return math.floor((1 + (level - 1) * 0.2) * 10) / 10
-end
-
-local function sizePrice(level)
-    return math.floor(level ^ 3 / 2) * 20
-end
-
-local function speedPrice(level)
-    return math.floor((level * 3) ^ 3 / 200) * 1000
-end
-
-local function multiplierPrice(level)
-    return math.floor((level * 10) ^ 3 / 200) * 1000
-end
-
-local function eatSpeedPrice(level)
-    return math.floor((level * 10) ^ 3 / 200) * 2000
-end
-
-local function teleportPos()
-    LocalPlayer.Character:PivotTo(CFrame.new(0, LocalPlayer.Character.Humanoid.HipHeight * 2, -100) * CFrame.Angles(0, math.rad(-90), 0))
-end
-
-main:CreateToggle("自动刷", function(enabled)
+createEatToggle(autoContent, "自动刷", function(enabled)
     autofarm = enabled
-    
     coroutine.wrap(function()
     	local text = Drawing.new("Text")
     	text.Outline = true
@@ -94,47 +1326,25 @@ main:CreateToggle("自动刷", function(enabled)
     	text.Text = ""
     	text.Size = 14
     	text.Visible = true
-    	
     	local startTime = tick()
     	local eatTime = 0
     	local lastEatTime = tick()
-        
         local timer = 0
         local grabTimer = 0
         local sellDebounce = false
         local sellCount = 0
-        
         local bedrock = Instance.new("Part")
         bedrock.Anchored = true
         bedrock.Size = Vector3.new(2048, 10, 2048)
         bedrock.Position = Vector3.new(0, -5, 0)
-        -- bedrock.Transparency = 1
         bedrock.BrickColor = BrickColor.Black()
         bedrock.Parent = workspace
-
         local map, chunks = workspace:FindFirstChild("Map"), workspace:FindFirstChild("Chunks")
-        if map and chunks then
-            map.Parent, chunks.Parent = nil, nil
-        end
-
+        if map and chunks then map.Parent, chunks.Parent = nil, nil end
         local numChunks = 0
-        
-        local hum,
-            root,
-            size,
-            events,
-            eat,
-            grab,
-            sell,
-            sendTrack,
-            chunk,
-            radius,
-            autoConn,
-            sizeConn
-        
+        local hum, root, size, events, eat, grab, sell, sendTrack, chunk, radius, autoConn, sizeConn
         local function onCharAdd(char)
             numChunks = 0
-            
             hum = char:WaitForChild("Humanoid")
             root = char:WaitForChild("HumanoidRootPart")
             size = char:WaitForChild("Size")
@@ -146,77 +1356,43 @@ main:CreateToggle("自动刷", function(enabled)
             sendTrack = char:WaitForChild("SendTrack")
             radius = char:WaitForChild("Radius")
             autoConn = game["Run Service"].Heartbeat:Connect(function(dt)
-                if not autofarm then
-                    autoConn:Disconnect()
-                    return
-                end
-                
+                if not autofarm then autoConn:Disconnect() return end
                 local ran = tick() - startTime
                 local hours = math.floor(ran / 60 / 60)
                 local minutes = math.floor(ran / 60)
                 local seconds = math.floor(ran)
-                
                 local eatMinutes = math.floor(eatTime / 60)
                 local eatSeconds = math.floor(eatTime)
-                
                 local y = bedrock.Position.Y + bedrock.Size.Y / 2 + hum.HipHeight + root.Size.Y / 2
-
                 local sizeAdd = LocalPlayer.Upgrades.Multiplier.Value / 100
                 local addAmount = LocalPlayer.Upgrades.MaxSize.Value / sizeAdd
-                
                 local sellTime = addAmount / 2
                 local sellMinutes = math.floor(sellTime / 60)
                 local sellSeconds = math.floor(sellTime)
-                
                 local secondEarn = math.floor(sizeGrowth(LocalPlayer.Upgrades.MaxSize.Value) / sellTime)
                 local minuteEarn = secondEarn * 60
                 local hourEarn = minuteEarn * 60
                 local dayEarn = hourEarn * 24
-                
-                text.Text = ""
-                    .. "\n运行时间: " .. string.format("%ih%im%is", hours, minutes % 60, seconds % 60)
-                    .. "\n实际时间: " .. string.format("%im%is", eatMinutes % 60, eatSeconds % 60)
-                    .. "\n大约时间: " .. string.format("%im%is", sellMinutes % 60, sellSeconds % 60)
-                    .. "\n每天: " .. dayEarn
-                    .. "\n块数: " .. numChunks
-                
+                text.Text = "\n运行时间: " .. string.format("%ih%im%is", hours, minutes % 60, seconds % 60) .. "\n实际时间: " .. string.format("%im%is", eatMinutes % 60, eatSeconds % 60) .. "\n大约时间: " .. string.format("%im%is", sellMinutes % 60, sellSeconds % 60) .. "\n每天: " .. dayEarn .. "\n块数: " .. numChunks
                 hum:ChangeState(Enum.HumanoidStateType.Physics)
                 grab:FireServer()
                 root.Anchored = false
                 eat:FireServer()
                 sendTrack:FireServer()
-                
                 if chunk.Value then
-                    if timer > 0 then
-                        numChunks += 1
-                    end
+                    if timer > 0 then numChunks += 1 end
                     timer = 0
                     grabTimer += dt
                 else
                     timer += dt
                     grabTimer = 0
                 end
-                
-                if timer > 60 then
-                    hum.Health = 0
-                    timer = 0
-                    numChunks = 0
-                end
-                
-                if grabTimer > 15 then
-                    size.Value = LocalPlayer.Upgrades.MaxSize.Value
-                end
-                
-                if (size.Value >= LocalPlayer.Upgrades.MaxSize.Value)
-                    or timer > 8
-                then
+                if timer > 60 then hum.Health = 0 timer = 0 numChunks = 0 end
+                if grabTimer > 15 then size.Value = LocalPlayer.Upgrades.MaxSize.Value end
+                if (size.Value >= LocalPlayer.Upgrades.MaxSize.Value) or timer > 8 then
                     if timer < 8 then
                         sell:FireServer()
-                        
-                        if not sellDebounce then
-                            changeMap()
-                        end
-                        
+                        if not sellDebounce then changeMap() end
                         sellDebounce = true
                     else
                         changeMap()
@@ -227,69 +1403,40 @@ main:CreateToggle("自动刷", function(enabled)
                         local currentEatTime = tick()
                         eatTime = currentEatTime - lastEatTime
                         lastEatTime = currentEatTime
-                        
                         sellCount += 1
                     end
                     sellDebounce = false
                 end
-                
                 if farmMoving then
                     local bound = 300
                     local startPos = CFrame.new(-bound/2, y, -bound/2)
-                    
                     local r = radius.Value * 1.1
                     local dist = (r * numChunks)
                     local x = dist % bound
                     local z = math.floor(dist / bound) * r
                     local offset = CFrame.new(x, 0, z + r * 2)
-                    
-                    if z > bound then
-                        changeMap()
-                        numChunks = 0
-                    end
-                    
+                    if z > bound then changeMap() numChunks = 0 end
                     root.CFrame = startPos * offset
-                    -- root.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, math.atan2(x, z) + math.pi, 0)
                 else
                     root.CFrame = CFrame.new(0, y, 0)
                 end
             end)
-            
-            hum.Died:Connect(function()
-                autoConn:Disconnect()
-                changeMap()
-            end)
-            
+            hum.Died:Connect(function() autoConn:Disconnect() changeMap() end)
             char:WaitForChild("LocalChunkManager").Enabled = false
             char:WaitForChild("Animate").Enabled = false
         end
-        
-        if LocalPlayer.Character then
-            task.spawn(onCharAdd, LocalPlayer.Character)
-        else
-            task.spawn(onCharAdd, LocalPlayer.CharacterAdded:Wait())
-        end
+        if LocalPlayer.Character then task.spawn(onCharAdd, LocalPlayer.Character) else task.spawn(onCharAdd, LocalPlayer.CharacterAdded:Wait()) end
         local charAddConn = LocalPlayer.CharacterAdded:Connect(onCharAdd)
         while autofarm do
             local dt = task.wait()
-            if workspace:FindFirstChild("Loading") then
-                workspace.Loading:Destroy()
-            end
+            if workspace:FindFirstChild("Loading") then workspace.Loading:Destroy() end
             if map and chunks then
-                if showMap then
-                    map.Parent, chunks.Parent = workspace, workspace
-                else
-                    map.Parent, chunks.Parent = nil, nil
-                end
+                if showMap then map.Parent, chunks.Parent = workspace, workspace else map.Parent, chunks.Parent = nil, nil end
             end
         end
         charAddConn:Disconnect()
-        if autoConn then
-            autoConn:Disconnect()
-        end
-        if map and chunks then
-            map.Parent, chunks.Parent = workspace, workspace
-        end
+        if autoConn then autoConn:Disconnect() end
+        if map and chunks then map.Parent, chunks.Parent = workspace, workspace end
         hum:ChangeState(Enum.HumanoidStateType.GettingUp)
         bedrock:Destroy()
         LocalPlayer.Character.LocalChunkManager.Enabled = true
@@ -298,15 +1445,13 @@ main:CreateToggle("自动刷", function(enabled)
     end)()
 end)
 
-main:CreateToggle("自动收", function(enabled)
+createEatToggle(autoContent, "自动收", function(enabled)
     autoCollectingCubes = enabled
-    
     coroutine.wrap(function()
         LocalPlayer.PlayerScripts.CubeVis.Enabled = false
         while autoCollectingCubes do
             task.wait()
             local root = getRoot()
-            
             if root then
                 for _, v in workspace:GetChildren() do
                     if v.Name == "Cube" and v:FindFirstChild("Owner") and (v.Owner.Value == LocalPlayer.Name or v.Owner.Value == "") then
@@ -319,38 +1464,27 @@ main:CreateToggle("自动收", function(enabled)
     end)()
 end)
 
-main:CreateToggle("自动领", function(enabled)
+createEatToggle(autoContent, "自动领", function(enabled)
     autoClaimRewards = enabled
-    
     coroutine.wrap(function()
         while autoClaimRewards do
             task.wait(1)
             for _, reward in LocalPlayer.TimedRewards:GetChildren() do
-                if reward.Value > 0 then
-                    Events.RewardEvent:FireServer(reward)
-                end
+                if reward.Value > 0 then Events.RewardEvent:FireServer(reward) end
             end
-            
             Events.SpinEvent:FireServer()
         end
     end)()
 end)
 
-main:CreateToggle("移动模式", function(enabled)
-    farmMoving = enabled
-end)
+createEatToggle(autoContent, "移动模式", function(enabled) farmMoving = enabled end)
+createEatToggle(autoContent, "显示地图", function(enabled) showMap = enabled end)
 
-main:CreateToggle("显示地图", function(enabled)
-    showMap = enabled
-end)
-
-main:CreateToggle("自动吃", function(enabled)
+createEatToggle(autoContent, "自动吃", function(enabled)
     autoeat = enabled
-    
     coroutine.wrap(function()
         while autoeat do
             local dt = task.wait()
-            
             if checkLoaded() then
                 LocalPlayer.Character.HumanoidRootPart.Anchored = false
                 LocalPlayer.Character.Events.Grab:FireServer()
@@ -360,61 +1494,48 @@ main:CreateToggle("自动吃", function(enabled)
     end)()
 end)
 
-upgrades:CreateToggle("大小", function(enabled)
+local upgradeWindow, upgradeContent = createEatWorldWindow("升级", 300, 300)
+
+createEatToggle(upgradeContent, "大小", function(enabled)
     autoUpgradeSize = enabled
-    
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
-        while autoUpgradeSize do
-            task.wait(1)
-            Events.PurchaseEvent:FireServer("MaxSize")
-        end
+        while autoUpgradeSize do task.wait(1) Events.PurchaseEvent:FireServer("MaxSize") end
         game.CoreGui.PurchasePromptApp.Enabled = true
     end)()
 end)
 
-upgrades:CreateToggle("移速", function(enabled)
+createEatToggle(upgradeContent, "移速", function(enabled)
     autoUpgradeSpd = enabled
-    
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
-        while autoUpgradeSpd do
-            task.wait(1)
-            Events.PurchaseEvent:FireServer("Speed")
-        end
+        while autoUpgradeSpd do task.wait(1) Events.PurchaseEvent:FireServer("Speed") end
         game.CoreGui.PurchasePromptApp.Enabled = true
     end)()
 end)
 
-upgrades:CreateToggle("乘数", function(enabled)
+createEatToggle(upgradeContent, "乘数", function(enabled)
     autoUpgradeMulti = enabled
-    
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
-        while autoUpgradeMulti do
-            task.wait(1)
-            Events.PurchaseEvent:FireServer("Multiplier")
-        end
+        while autoUpgradeMulti do task.wait(1) Events.PurchaseEvent:FireServer("Multiplier") end
         game.CoreGui.PurchasePromptApp.Enabled = true
     end)()
 end)
 
-upgrades:CreateToggle("吃速", function(enabled)
+createEatToggle(upgradeContent, "吃速", function(enabled)
     autoUpgradeEat = enabled
-    
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
-        while autoUpgradeEat do
-            task.wait(1)
-            Events.PurchaseEvent:FireServer("EatSpeed")
-        end
+        while autoUpgradeEat do task.wait(1) Events.PurchaseEvent:FireServer("EatSpeed") end
         game.CoreGui.PurchasePromptApp.Enabled = true
     end)()
 end)
 
-figure:CreateToggle("取消锚固", function(enabled)
+local figureWindow, figureContent = createEatWorldWindow("人物", 300, 250)
+
+createEatToggle(figureContent, "取消锚固", function(enabled)
     keepUnanchor = enabled
-    
     coroutine.wrap(function()
         while keepUnanchor do
             task.wait()
@@ -425,9 +1546,8 @@ figure:CreateToggle("取消锚固", function(enabled)
     end)()
 end)
 
-figure:CreateToggle("边界保护", function(enabled)
+createEatToggle(figureContent, "边界保护", function(enabled)
     boundProtect = enabled
-    
     coroutine.wrap(function()
         while boundProtect do
             task.wait()
@@ -435,1153 +1555,117 @@ figure:CreateToggle("边界保护", function(enabled)
                 local root = LocalPlayer.Character.HumanoidRootPart
                 local pos = root.Position
                 local mapSize = workspace.Map.Bedrock.Size * Vector3.new(1, 0, 1)
-                local clampedPos = vector.clamp(pos * Vector3.new(1, 0, 1), -mapSize / 2, mapSize / 2)
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(clampedPos.X, pos.Y, clampedPos.Z) * root.CFrame.Rotation
+                local clampedPos = Vector3.new(math.clamp(pos.X, -mapSize.X / 2, mapSize.X / 2), pos.Y, math.clamp(pos.Z, -mapSize.Z / 2, mapSize.Z / 2))
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(clampedPos) * root.CFrame.Rotation
             end
         end
     end)()
 end)
 
-others:CreateButton("查看玩家数据", function()
-    local localization = {
-        MaxSize = "体积",
-        Speed = "移速",
-        Multiplier = "乘数",
-        EatSpeed = "吃速",
-    }
-    local growthFunctions = {
-        MaxSize = sizeGrowth,
-        Speed = speedGrowth,
-        Multiplier = multiplierGrowth,
-        EatSpeed = eatSpeedGrowth,
-    }
-    local priceFunctions = {
-        MaxSize = sizePrice,
-        Speed = speedPrice,
-        Multiplier = multiplierPrice,
-        EatSpeed = eatSpeedPrice,
-    }
+local otherWindow, otherContent = createEatWorldWindow("其它", 300, 250)
+
+createEatButton(otherContent, "查看玩家数据", function()
+    local localization = {MaxSize = "体积", Speed = "移速", Multiplier = "乘数", EatSpeed = "吃速"}
+    local growthFunctions = {MaxSize = sizeGrowth, Speed = speedGrowth, Multiplier = multiplierGrowth, EatSpeed = eatSpeedGrowth}
+    local priceFunctions = {MaxSize = sizePrice, Speed = speedPrice, Multiplier = multiplierPrice, EatSpeed = eatSpeedPrice}
     for _, player in Players:GetPlayers() do
         print()
         for _, upg in player.Upgrades:GetChildren() do
             local content = player.Name .. "："
-            
             local cost = 0
-            for l = 2, upg.Value do
-                cost += priceFunctions[upg.Name](l)
-            end
-            
-            content = content .. " " .. `{localization[upg.Name]}：`
-            content = content .. " " .. `{upg.Value}级；`
-            content = content .. " " .. `{growthFunctions[upg.Name](upg.Value)}值；`
-            content = content .. " " .. `{cost}花费；`
-            
+            for l = 2, upg.Value do cost += priceFunctions[upg.Name](l) end
+            content = content .. " " .. localization[upg.Name] .. "：" .. upg.Value .. "级；" .. growthFunctions[upg.Name](upg.Value) .. "值；" .. cost .. "花费；"
             print(content)
         end
     end
-    
     game.StarterGui:SetCore("DevConsoleVisible", true)
 end)
 
-others:CreateToggle("竖屏", function(enabled)
+createEatToggle(otherContent, "竖屏", function(enabled)
     LocalPlayer.PlayerGui.ScreenOrientation = enabled and Enum.ScreenOrientation.Portrait or Enum.ScreenOrientation.LandscapeRight
 end)
 
+buttonFrame.Size = UDim2.new(1, 0, 0, 210)
 
--- local args = {
-	-- "Mega"
--- }
--- game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestTeleport"):FireServer(unpack(args))
+local eatWorldY = 95
+createSmallButton("自动", Color3.fromRGB(255, 165, 0), "🤖", UDim2.new(0, 5, 0, eatWorldY), function()
+    autoWindow.Visible = not autoWindow.Visible
+    speedWindow.Visible = false
+    colorWindow.Visible = false
+    upgradeWindow.Visible = false
+    figureWindow.Visible = false
+    otherWindow.Visible = false
+end)
 
--- game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("SpinEvent"):FireServer()
+createSmallButton("升级", Color3.fromRGB(34, 139, 34), "⬆️", UDim2.new(0, 170, 0, eatWorldY), function()
+    upgradeWindow.Visible = not upgradeWindow.Visible
+    speedWindow.Visible = false
+    colorWindow.Visible = false
+    autoWindow.Visible = false
+    figureWindow.Visible = false
+    otherWindow.Visible = false
+end)
 
--- Purchases: MaxSize, Speed, Multiplier, EatSpeed
+createSmallButton("人物", Color3.fromRGB(138, 43, 226), "👤", UDim2.new(0, 5, 0, eatWorldY + 45), function()
+    figureWindow.Visible = not figureWindow.Visible
+    speedWindow.Visible = false
+    colorWindow.Visible = false
+    autoWindow.Visible = false
+    upgradeWindow.Visible = false
+    otherWindow.Visible = false
+end)
 
---[[
+createSmallButton("其它", Color3.fromRGB(70, 130, 180), "📋", UDim2.new(0, 170, 0, eatWorldY + 45), function()
+    otherWindow.Visible = not otherWindow.Visible
+    speedWindow.Visible = false
+    colorWindow.Visible = false
+    autoWindow.Visible = false
+    upgradeWindow.Visible = false
+    figureWindow.Visible = false
+end)
 
--- Decompiler will be improved VERY SOON!
--- Decompiled with Konstant V2.1, a fast Luau decompiler made in Luau by plusgiant5 (https://discord.gg/brNTY8nX8t)
--- Decompiled on 2025-07-20 07:47:16
--- Luau version 6, Types version 3
--- Time taken: 0.005614 seconds
+print("🎮 小拽脚本 + 吃吃世界功能已加载完成!")
 
-local module_8 = {
-	GamePasses = {
-		["Eat Players"] = 720768665;
-		Magnet = 730280015;
-		["Explosive Chunks"] = 733742262;
-	};
-	DevProducts = {
-		["Small Cube Pack"] = 1760706156;
-		["Medium Cube Pack"] = 1760707045;
-		["Large Cube Pack"] = 1760707972;
-		["Giant Cube Pack"] = 1760709729;
-		["Max Size"] = 1760728424;
-		["Small Token Pack"] = 1805507066;
-		["Medium Token Pack"] = 1805507931;
-		["Large Token Pack"] = 1805509180;
-		["Giant Token Pack"] = 1805509730;
-		["Starter Pack"] = 1942042820;
-		["Holiday Pack 2024"] = 2678435873;
-		["Rainbow Pack"] = 2839548304;
-	};
-	CubePacks = {
-		["Small Cube Pack"] = 60000;
-		["Medium Cube Pack"] = 150000;
-		["Large Cube Pack"] = 600000;
-		["Giant Cube Pack"] = 2000000;
-	};
-	TokenPacks = {
-		["Small Token Pack"] = 3;
-		["Medium Token Pack"] = 5;
-		["Large Token Pack"] = 15;
-		["Giant Token Pack"] = 50;
-	};
-	Bundles = {
-		["Starter Pack"] = {
-			Tokens = 10;
-			Cubes = 150000;
-		};
-		["Holiday Pack 2024"] = {
-			Tokens = 50;
-			Cubes = 2000000;
-		};
-		["Rainbow Pack"] = {
-			Tokens = 50;
-			Cubes = 2000000;
-		};
-	};
-	LimitedPurchases = {
-		["Starter Pack"] = 1;
-		["Holiday Pack 2024"] = 0;
-		["Rainbow Pack"] = 1;
-	};
-	Events = {
-		["Money Rain"] = {
-			name = "Money Rain";
-			price = 3;
-			image = "rbxassetid://17099910913";
-			description = "Rains money from the sky!";
-			message = "It's raining money!";
-			duration = 60;
-		};
-		Robot = {
-			name = "Money Rain";
-			price = 5;
-			image = "rbxassetid://17099910828";
-			description = "Summon a robot to destroy the map!";
-			message = "A robot is attacking!";
-			duration = 60;
-		};
-		Nuke = {
-			name = "Money Rain";
-			price = 10;
-			image = "rbxassetid://17099911657";
-			description = "Destroys most of the map!";
-			message = "A NUKE IS FALLING! RUN AWAY FROM THE CENTER!";
-			duration = 30;
-		};
-		["Big Food"] = {
-			name = "Money Rain";
-			price = nil;
-			image = "rbxassetid://13902932122";
-			description = "Rains giant food that gives extra size!";
-			duration = 30;
-		};
-		Skeletons = {
-			name = "Money Rain";
-			price = 5;
-			image = "rbxassetid://17099910709";
-			description = "Summon skeletons to destroy the map!";
-			message = "Skeletons are attacking!";
-			duration = 60;
-		};
-		["Low Gravity"] = {
-			name = "Low Gravity";
-			price = 1;
-			image = "rbxassetid://17099910598";
-			description = "Make everything float!";
-			message = "Low gravity!";
-			duration = 40;
-		};
-	};
-}
-local tbl = {}
-local tbl_3 = {
-	price = 10;
-	description = "98% chance to get a random color nametag, 2% chance to get a GLOWING color nametag!";
-	decal = "rbxassetid://110003088413698";
-	possibilities = {"Green", "Cyan", "Purple", "Pink", "Blue", "Orange", "Red", "Yellow", "Glowing Green", "Glowing Cyan", "Glowing Purple", "Glowing Pink", "Glowing Red", "Glowing Yellow"};
-}
-local function getCrate() -- Line 143
-	local module_3 = {"Green", "Cyan", "Purple", "Pink", "Blue", "Orange", "Red", "Yellow"}
-	local module_2 = {"Glowing Green", "Glowing Cyan", "Glowing Purple", "Glowing Pink", "Glowing Red", "Glowing Yellow"}
-	if 0.98 < math.random() then
-		return module_2[math.random(1, #module_2)]
-	end
-	return module_3[math.random(1, #module_3)]
+
+-- 重置所有功能函数
+local function resetAllFeatures()
+    if flying then
+        flying = false
+        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+        if bodyAngularVelocity then bodyAngularVelocity:Destroy() bodyAngularVelocity = nil end
+        toggleFlyBtn.Text = "开启飞天"
+        toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
+        toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+        leftControlFrame.Visible = false
+    end
+    autofarm = false
+    autoCollectingCubes = false
+    autoClaimRewards = false
+    farmMoving = false
+    showMap = false
+    autoeat = false
+    autoUpgradeSize = false
+    autoUpgradeSpd = false
+    autoUpgradeMulti = false
+    autoUpgradeEat = false
+    keepUnanchor = false
+    boundProtect = false
+    resetPlayerState()
+    local map, chunks = workspace:FindFirstChild("Map"), workspace:FindFirstChild("Chunks")
+    if map and chunks and (map.Parent == nil or chunks.Parent == nil) then
+        map.Parent, chunks.Parent = workspace, workspace
+    end
+    if player.Character then
+        local localChunkManager = player.Character:FindFirstChild("LocalChunkManager")
+        local animate = player.Character:FindFirstChild("Animate")
+        if localChunkManager then localChunkManager.Enabled = true end
+        if animate then animate.Enabled = true end
+    end
+    print("✅ 所有功能已重置")
 end
-tbl_3.getCrate = getCrate
-tbl["Color Crate"] = tbl_3
-local tbl_2 = {
-	price = 25;
-	description = "80% chance to get a common nametag, 18% chance to get an uncommon nametag, 2% chance to get a RARE nametag!";
-	color = Color3.new(1, 0.905882, 0.752941);
-	possibilities = {"Draw Four", "Velvet", "Mysterious", "Sketchbook", "Viscount", "Lolcats", "3D Movie", "Fruit Salad", "Bubblegum"};
-}
-local function getCrate() -- Line 185
-	local module_6 = {"Draw Four", "Velvet", "Mysterious", "Sketchbook", "Viscount"}
-	local module_4 = {"Lolcats", "3D Movie", "Fruit Salad"}
-	local module_7 = {"Bubblegum"}
-	local seed_2 = math.random()
-	if 0.98 < seed_2 then
-		return module_7[math.random(1, #module_7)]
-	end
-	if 0.8 < seed_2 then
-		return module_4[math.random(1, #module_4)]
-	end
-	return module_6[math.random(1, #module_6)]
-end
-tbl_2.getCrate = getCrate
-tbl["Standard Crate"] = tbl_2
-tbl["Digital Crate"] = {
-	price = 25;
-	description = "80% chance to get a common nametag, 18% chance to get an uncommon nametag, 2% chance to get a RARE nametag!";
-	decal = "rbxassetid://118112669619148";
-	possibilities = {"Vaporwave", "Nostalgia", "Relaxed", "Solar", "Neon", "Wireframe", "Futuristic", "Glitchcore"};
-	getCrate = function() -- Line 219, Named "getCrate"
-		local module = {"Vaporwave", "Nostalgia", "Relaxed"}
-		local module_9 = {"Solar", "Neon", "Wireframe"}
-		local module_5 = {"Futuristic", "Glitchcore"}
-		local seed = math.random()
-		if 0.98 < seed then
-			return module_5[math.random(1, #module_5)]
-		end
-		if 0.8 < seed then
-			return module_9[math.random(1, #module_9)]
-		end
-		return module[math.random(1, #module)]
-	end;
-}
-module_8.Crates = tbl
-module_8.Nametags = {
-	Green = {
-		description = "";
-		rarity = 1;
-	};
-	Cyan = {
-		description = "";
-		rarity = 1;
-	};
-	Purple = {
-		description = "";
-		rarity = 1;
-	};
-	Pink = {
-		description = "";
-		rarity = 1;
-	};
-	Blue = {
-		description = "";
-		rarity = 1;
-	};
-	Orange = {
-		description = "";
-		rarity = 1;
-	};
-	Red = {
-		description = "";
-		rarity = 1;
-	};
-	Yellow = {
-		description = "";
-		rarity = 1;
-	};
-	["Glowing Green"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Cyan"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Purple"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Pink"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Orange"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Red"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Glowing Yellow"] = {
-		description = "";
-		rarity = 3;
-	};
-	["Draw Four"] = {
-		description = "";
-		rarity = 1;
-	};
-	Velvet = {
-		description = "";
-		rarity = 1;
-	};
-	Mysterious = {
-		description = "";
-		rarity = 1;
-	};
-	Sketchbook = {
-		description = "";
-		rarity = 1;
-	};
-	Viscount = {
-		description = "";
-		rarity = 1;
-	};
-	Diary = {
-		description = "";
-		rarity = 1;
-	};
-	Lolcats = {
-		description = "";
-		rarity = 2;
-	};
-	["3D Movie"] = {
-		description = "";
-		rarity = 2;
-	};
-	["Fruit Salad"] = {
-		description = "";
-		rarity = 2;
-	};
-	Bubblegum = {
-		description = "";
-		rarity = 3;
-	};
-	Vaporwave = {
-		description = "";
-		rarity = 1;
-	};
-	Nostalgia = {
-		description = "";
-		rarity = 1;
-	};
-	Relaxed = {
-		description = "";
-		rarity = 1;
-	};
-	Solar = {
-		description = "";
-		rarity = 2;
-	};
-	Neon = {
-		description = "";
-		rarity = 2;
-	};
-	Wireframe = {
-		description = "";
-		rarity = 2;
-	};
-	Futuristic = {
-		description = "";
-		rarity = 3;
-	};
-	Glitchcore = {
-		description = "";
-		rarity = 3;
-	};
-	["Candy Cane"] = {
-		description = "Awarded to players who completed the 2024 Holiday Quest!";
-		rarity = 4;
-	};
-	["Festive Gold"] = {
-		description = "Awarded to players who purchased the 2024 Holiday Pack!";
-		rarity = 5;
-	};
-	Rainbow = {
-		description = "Awarded to players who purchased the Rainbow Pack!";
-		rarity = 5;
-	};
-	["Token Hunter"] = {
-		description = "Awarded to players who completed The Hunt: Mega Edition quest!";
-		rarity = 4;
-	};
-}
-local tbl_4 = {}
-local tbl_6 = {
-	name = "Maximum Size";
-	order = 1;
-	initial = 0.5;
-	maxLevel = 10;
-	image = "rbxassetid://17151582981";
-	color = Color3.new(0.596078, 1, 0.698039);
-}
-local function priceFunction(arg1) -- Line 407
-	return math.floor(arg1 ^ 3 / 2) * 20
-end
-tbl_6.priceFunction = priceFunction
-local function growthFunction(arg1) -- Line 412
-	return math.floor(((arg1 + 0.5) ^ 2 - 0.25) / 2 * 100)
-end
-tbl_6.growthFunction = growthFunction
-tbl_4.MaxSize = tbl_6
-local tbl_7 = {
-	name = "Walk Speed";
-	order = 2;
-	initial = 0.5;
-	maxLevel = 10;
-	image = "rbxassetid://17137197155";
-	color = Color3.new(0.439216, 0.541176, 1);
-}
-local function priceFunction(arg1) -- Line 425
-	return math.floor((arg1 * 3) ^ 3 / 200) * 1000
-end
-tbl_7.priceFunction = priceFunction
-local function growthFunction(arg1) -- Line 431
-	return math.floor(arg1 * 2 + 10)
-end
-tbl_7.growthFunction = growthFunction
-tbl_4.Speed = tbl_7
-local tbl_5 = {
-	name = "Size Multiplier";
-	order = 3;
-	initial = 0.5;
-	maxLevel = 10;
-	image = "rbxassetid://17137197010";
-	color = Color3.new(1, 0.384314, 0.396078);
-}
-local function priceFunction(arg1) -- Line 445
-	return math.floor((arg1 * 10) ^ 3 / 200) * 1000
-end
-tbl_5.priceFunction = priceFunction
-local function growthFunction(arg1) -- Line 451
-	return math.floor(arg1)
-end
-tbl_5.growthFunction = growthFunction
-tbl_4.Multiplier = tbl_5
-tbl_4.EatSpeed = {
-	name = "Eat Speed";
-	order = 4;
-	initial = 0.5;
-	maxLevel = 10;
-	image = "rbxassetid://16676559094";
-	color = Color3.new(1, 0.854902, 0.521569);
-	priceFunction = function(arg1) -- Line 465, Named "priceFunction"
-		return math.floor((arg1 * 10) ^ 3 / 200) * 2000
-	end;
-	growthFunction = function(arg1) -- Line 471, Named "growthFunction"
-		return math.floor((1 + (arg1 - 1) * 0.2) * 10) / 10
-	end;
-}
-module_8.Upgrades = tbl_4
-module_8.Tools = {}
-module_8.Descriptions = {
-	["Eat Players"] = "Eat players smaller than you to steal their size!";
-	Magnet = "Automatically collect money!";
-	["Explosive Chunks"] = "Anything you throw explodes on impact, dealing more damage!";
-}
-return module_8
 
-]]
+buttonFrame.Size = UDim2.new(1, 0, 0, 255)
 
--- local values = {}
--- local conn conn = game.Players.LocalPlayer.Character.Size.Changed:Connect(function(value)
-    -- if value <= 1 then
-        -- conn:Disconnect()
-        -- toclipboard(table.concat(values, "\n"))
-    -- end
-    -- table.insert(values, value)
-    -- print(value)
--- end)
-
--- function calculateGiantSize(multiplier, index)
-    -- local baseValue = 0.88 * index + 0.015 * index^2 + 0.001 * index^3
-    -- return tonumber(string.format("%.2f", baseValue * (multiplier / 45)))
--- end
-
--- local data = ([[
--- 0
--- 1.8
--- 3.6
--- 4.95
--- 5.85
--- 7.2
--- 9
--- 9.9
--- 10.8
--- 12.15
--- 13.05
--- 14.4
--- 15.75
--- 17.1
--- 18.45
--- 20.25
--- 21.6
--- 22.5
--- 23.85
--- 25.65
--- 26.55
--- 27.9
--- 28.8
--- 30.6
--- 31.5
--- 32.85
--- 34.2
--- 35.55
--- 36.9
--- 38.25
--- 39.15
--- 40.95
--- 42.3
--- 43.65
--- 45.45
--- 46.35
--- 47.25
--- 48.15
--- 49.05
--- 50.849999999999994
--- 52.64999999999999
--- 54.44999999999999
--- 56.249999999999986
--- 58.04999999999998
--- 59.84999999999998
--- 61.64999999999998
--- 62.99999999999998
--- 64.79999999999998
--- 66.59999999999998
--- 68.39999999999998
--- 69.29999999999998
--- 71.09999999999998
--- 72.44999999999997
--- 73.34999999999998
--- 75.14999999999998
--- 76.49999999999997
--- 78.29999999999997
--- 79.64999999999996
--- 80.99999999999996
--- 82.34999999999995
--- 84.14999999999995
--- 85.49999999999994
--- 86.39999999999995
--- 87.29999999999995
--- 88.19999999999996
--- 89.09999999999997
--- 89.99999999999997
--- 91.79999999999997
--- 93.59999999999997
--- 94.94999999999996
--- 96.74999999999996
--- 98.54999999999995
--- 99.44999999999996
--- 101.24999999999996
--- 102.59999999999995
--- 104.39999999999995
--- 105.74999999999994
--- 107.09999999999994
--- 108.44999999999993
--- 109.79999999999993
--- 110.69999999999993
--- 112.04999999999993
--- 113.39999999999992
--- 114.74999999999991
--- 115.64999999999992
--- 116.54999999999993
--- 117.89999999999992
--- 119.24999999999991
--- 120.14999999999992
--- 121.04999999999993
--- 122.84999999999992
--- 124.64999999999992
--- 125.54999999999993
--- 127.34999999999992
--- 129.14999999999992
--- 130.04999999999993
--- 131.84999999999994
--- 133.19999999999993
--- 134.09999999999994
--- 135.44999999999993
--- 136.79999999999993
--- 138.14999999999992
--- 139.94999999999993
--- 141.74999999999994
--- 143.54999999999995
--- 144.44999999999996
--- 145.79999999999995
--- 147.59999999999997
--- 148.94999999999996
--- 150.29999999999995
--- 152.09999999999997
--- 152.99999999999997
--- 154.79999999999998
--- 156.6
--- 158.4
--- 159.75
--- 161.1
--- 162
--- 163.8
--- 165.6
--- 166.95
--- 167.85
--- 168.75
--- 170.55
--- 171.9
--- 172.8
--- 174.6
--- 175.5
--- 176.85
--- 178.2
--- 179.1
--- 180.9
--- 182.25
--- 183.6
--- 184.5
--- 185.85
--- 187.2
--- 188.1
--- 189
--- 190.8
--- 192.15
--- 193.5
--- 194.4
--- 195.3
--- 197.1
--- 198.9
--- 200.7
--- 201.6
--- 202.5]]):split("\n")
-
-
--- Decompiler will be improved VERY SOON!
--- Decompiled with Konstant V2.1, a fast Luau decompiler made in Luau by plusgiant5 (https://discord.gg/brNTY8nX8t)
--- Decompiled on 2025-08-03 09:44:11
--- Luau version 6, Types version 3
--- Time taken: 0.014768 seconds
-
--- local LocalPlayer_upvr = game.Players.LocalPlayer
--- local Parent_upvr = script.Parent
--- local Humanoid_upvr = Parent_upvr:WaitForChild("Humanoid")
--- local HumanoidRootPart_upvr = Parent_upvr:WaitForChild("HumanoidRootPart")
--- local tbl_2_upvr = {}
--- local CurrentChunk_upvr = script.Parent:WaitForChild("CurrentChunk")
--- local Radius = script.Parent:WaitForChild("Radius")
--- local Debris_upvr = game:GetService("Debris")
--- local UserGameSettings_upvr = UserSettings():GetService("UserGameSettings")
--- local function shuffle_upvr(arg1) -- Line 16, Named "shuffle"
-	-- for i = #arg1, 1, -1 do
-		-- local randint_from_1 = math.random(i)
-		-- arg1[i] = arg1[randint_from_1]
-		-- arg1[randint_from_1] = arg1[i]
-	-- end
--- end
--- local var16_upvw = 0
--- local Part_upvr_2 = Instance.new("Part")
--- Part_upvr_2.Name = "Barrier"
--- Part_upvr_2.Massless = true
--- Part_upvr_2.Transparency = 1
--- Part_upvr_2.Size = Vector3.new(HumanoidRootPart_upvr.Size.X, 1, 0.1)
--- local Weld_upvr = Instance.new("Weld")
--- Weld_upvr.Parent = Part_upvr_2
--- Weld_upvr.Part0 = HumanoidRootPart_upvr
--- Weld_upvr.Part1 = Part_upvr_2
--- Weld_upvr.C0 = CFrame.new(0, 0, -1.343)
--- Part_upvr_2.CollisionGroup = "HRP"
--- Part_upvr_2.CanQuery = false
--- Part_upvr_2.CanTouch = false
--- Instance.new("Attachment").Parent = Part_upvr_2
--- Part_upvr_2.Parent = Parent_upvr
--- function setBarrier() -- Line 51
-	-- --[[ Upvalues[5]:
-		-- [1]: Parent_upvr (readonly)
-		-- [2]: HumanoidRootPart_upvr (readonly)
-		-- [3]: Part_upvr_2 (readonly)
-		-- [4]: Weld_upvr (readonly)
-		-- [5]: LocalPlayer_upvr (readonly)
-	-- ]]
-	-- local LeftElbow = Parent_upvr.LeftLowerArm.LeftElbow
-	-- local LeftWrist = Parent_upvr.LeftHand.LeftWrist
-	-- local _ = HumanoidRootPart_upvr.CFrame:ToObjectSpace(Parent_upvr.LeftUpperArm.LeftElbowRigAttachment.WorldCFrame).Position
-	-- local var23 = ((LeftElbow.C0.Position - LeftElbow.C1.Position).Magnitude + (LeftWrist.C0.Position - LeftWrist.C1.Position).Magnitude + 0.29552020666133955 * ((HumanoidRootPart_upvr.CFrame:ToObjectSpace(Parent_upvr.UpperTorso.LeftShoulderRigAttachment.WorldCFrame).Position - HumanoidRootPart_upvr.CFrame:ToObjectSpace(Parent_upvr.LeftFoot.LeftAnkleRigAttachment.WorldCFrame).Position) * Vector3.new(0, 1, 1)).Magnitude) * 1.1
-	-- Part_upvr_2.Size = Vector3.new(HumanoidRootPart_upvr.Size.X * 1.3, 1, var23 + HumanoidRootPart_upvr.Size.Z / 2)
-	-- Part_upvr_2.Attachment.Position = Vector3.new(0, 0, -Part_upvr_2.Size.Z / 2 + 0.05)
-	-- Weld_upvr.C0 = CFrame.new(0, 0, -var23 + Part_upvr_2.Size.Z / 2)
-	-- LocalPlayer_upvr.CameraMaxZoomDistance = math.clamp(HumanoidRootPart_upvr.Size.X * 6, 60, 1000)
--- end
--- script.Parent:WaitForChild("PhysicalSize").Changed:Connect(function() -- Line 77
-	-- wait()
-	-- setBarrier()
--- end)
--- local Value_upvw_2 = CurrentChunk_upvr.Value
--- local var26_upvw = math.ceil(Radius.Value) + 2
--- Radius.Changed:Connect(function(arg1) -- Line 87
-	-- --[[ Upvalues[1]:
-		-- [1]: var26_upvw (read and write)
-	-- ]]
-	-- var26_upvw = math.ceil(arg1) + 2
--- end)
--- local var28_upvw = true
--- local Particles = LocalPlayer_upvr:WaitForChild("Preferences"):FindFirstChild("Particles")
--- if Particles then
-	-- var28_upvw = Particles.Value
-	-- Particles.Changed:Connect(function(arg1) -- Line 95
-		-- --[[ Upvalues[1]:
-			-- [1]: var28_upvw (read and write)
-		-- ]]
-		-- var28_upvw = arg1
-	-- end)
--- end
--- function connectMarkers(arg1) -- Line 100
-	-- --[[ Upvalues[8]:
-		-- [1]: HumanoidRootPart_upvr (readonly)
-		-- [2]: Parent_upvr (readonly)
-		-- [3]: var28_upvw (read and write)
-		-- [4]: Value_upvw_2 (read and write)
-		-- [5]: shuffle_upvr (readonly)
-		-- [6]: var26_upvw (read and write)
-		-- [7]: Debris_upvr (readonly)
-		-- [8]: tbl_2_upvr (readonly)
-	-- ]]
-	-- table.insert(tbl_2_upvr, arg1:GetMarkerReachedSignal("Start"):Connect(function() -- Line 101
-		-- --[[ Upvalues[1]:
-			-- [1]: HumanoidRootPart_upvr (copied, readonly)
-		-- ]]
-		-- HumanoidRootPart_upvr.Anchored = true
-	-- end))
-	-- table.insert(tbl_2_upvr, arg1:GetMarkerReachedSignal("GrabChunk"):Connect(function() -- Line 104
-		-- --[[ Upvalues[2]:
-			-- [1]: arg1 (readonly)
-			-- [2]: Parent_upvr (copied, readonly)
-		-- ]]
-		-- arg1:AdjustSpeed(Parent_upvr.PullSpeed.Value)
-	-- end))
-	-- table.insert(tbl_2_upvr, arg1:GetMarkerReachedSignal("PullChunk"):Connect(function() -- Line 109
-		-- --[[ Upvalues[6]:
-			-- [1]: arg1 (readonly)
-			-- [2]: var28_upvw (copied, read and write)
-			-- [3]: Value_upvw_2 (copied, read and write)
-			-- [4]: shuffle_upvr (copied, readonly)
-			-- [5]: var26_upvw (copied, read and write)
-			-- [6]: Debris_upvr (copied, readonly)
-		-- ]]
-		-- arg1:AdjustSpeed(1)
-		-- if not var28_upvw then
-		-- else
-			-- if not Value_upvw_2 then return end
-			-- if not Value_upvw_2:FindFirstChild("PullParticles") then return end
-			-- for i_4, v_3 in ipairs(Value_upvw_2.PullParticles:GetChildren()) do
-				-- if var26_upvw < i_4 then break end
-				-- v_3.DustParticle:Emit(5)
-				-- local clone_4_upvr = v_3:Clone()
-				-- clone_4_upvr:ClearAllChildren()
-				-- clone_4_upvr.Size /= 2
-				-- clone_4_upvr.Parent = workspace
-				-- task.delay(0.2, function() -- Line 124
-					-- --[[ Upvalues[1]:
-						-- [1]: clone_4_upvr (readonly)
-					-- ]]
-					-- clone_4_upvr.CanCollide = true
-				-- end)
-				-- local var41 = ((clone_4_upvr.Position - Value_upvw_2.PrimaryPart.Position) * Vector3.new(1, 0, 1) + Vector3.new(0, 6, 0)) * clone_4_upvr.Mass
-				-- clone_4_upvr:ApplyImpulse(var41 * 10)
-				-- clone_4_upvr:ApplyAngularImpulse(Vector3.new(var41.Z, 0, var41.X))
-				-- Debris_upvr:AddItem(clone_4_upvr, math.random(2, 3))
-			-- end
-		-- end
-	-- end))
-	-- table.insert(tbl_2_upvr, arg1.Stopped:Connect(function() -- Line 134
-		-- --[[ Upvalues[1]:
-			-- [1]: HumanoidRootPart_upvr (copied, readonly)
-		-- ]]
-		-- HumanoidRootPart_upvr.Anchored = false
-	-- end))
--- end
--- local var44_upvw
--- local var45_upvw
--- local var46_upvw
--- var46_upvw = Humanoid_upvr:WaitForChild("Animator").AnimationPlayed:Connect(function(arg1) -- Line 143
-	-- --[[ Upvalues[3]:
-		-- [1]: var44_upvw (read and write)
-		-- [2]: var45_upvw (read and write)
-		-- [3]: var46_upvw (read and write)
-	-- ]]
-	-- if arg1.Priority == Enum.AnimationPriority.Action3 then
-		-- var44_upvw = arg1
-	-- elseif arg1.Priority == Enum.AnimationPriority.Action4 then
-		-- var45_upvw = arg1
-	-- end
-	-- if var45_upvw and var44_upvw then
-		-- var46_upvw:Disconnect()
-		-- script.Parent.SendTrack:FireServer()
-		-- setBarrier()
-		-- connectMarkers(var45_upvw)
-		-- connectMarkers(var44_upvw)
-	-- end
--- end)
--- local var47_upvw = false
--- local var48_upvw = false
--- local OverlapParams_new_result1_upvr = OverlapParams.new()
--- local tbl = {workspace.Map, Parent_upvr}
--- OverlapParams_new_result1_upvr.FilterDescendantsInstances = tbl
--- tbl = false
--- local var51_upvw = tbl
--- local Gamepasses = LocalPlayer_upvr:WaitForChild("Gamepasses")
--- local Eat_Players_upvw = Gamepasses:FindFirstChild("Eat Players")
--- if Eat_Players_upvw then
-	-- var51_upvw = Eat_Players_upvw.Value
-	-- if not var51_upvw then
-		-- Eat_Players_upvw.Changed:Once(function(arg1) -- Line 178
-			-- --[[ Upvalues[1]:
-				-- [1]: var51_upvw (read and write)
-			-- ]]
-			-- var51_upvw = arg1
-		-- end)
-		-- -- KONSTANTWARNING: GOTO [249] #178
-	-- end
--- else
-	-- local var56_upvw
-	-- var56_upvw = Gamepasses.ChildAdded:Connect(function(arg1) -- Line 184
-		-- --[[ Upvalues[3]:
-			-- [1]: var56_upvw (read and write)
-			-- [2]: Eat_Players_upvw (read and write)
-			-- [3]: var51_upvw (read and write)
-		-- ]]
-		-- if arg1.Name == "Eat Players" then
-			-- var56_upvw:Disconnect()
-			-- Eat_Players_upvw = arg1
-			-- var51_upvw = Eat_Players_upvw.Value
-			-- if not var51_upvw then
-				-- Eat_Players_upvw.Changed:Once(function(arg1_3) -- Line 190
-					-- --[[ Upvalues[1]:
-						-- [1]: var51_upvw (copied, read and write)
-					-- ]]
-					-- var51_upvw = arg1_3
-				-- end)
-			-- end
-		-- end
-	-- end)
--- end
--- local tbl_upvr = {
-	-- Grab = function(arg1) -- Line 199, Named "Grab"
-		-- --[[ Upvalues[7]:
-			-- [1]: var48_upvw (read and write)
-			-- [2]: var51_upvw (read and write)
-			-- [3]: Part_upvr_2 (readonly)
-			-- [4]: HumanoidRootPart_upvr (readonly)
-			-- [5]: Humanoid_upvr (readonly)
-			-- [6]: OverlapParams_new_result1_upvr (readonly)
-			-- [7]: var47_upvw (read and write)
-		-- ]]
-		-- -- KONSTANTERROR: [0] 1. Error Block 1 start (CF ANALYSIS FAILED)
-		-- local var60 = var48_upvw
-		-- -- KONSTANTERROR: [0] 1. Error Block 1 end (CF ANALYSIS FAILED)
-		-- -- KONSTANTERROR: [118] 85. Error Block 16 start (CF ANALYSIS FAILED)
-		-- -- KONSTANTWARNING: Failed to evaluate expression, replaced with nil [120.2]
-		-- arg1:FireServer(var47_upvw, var60, nil)
-		-- -- KONSTANTERROR: [118] 85. Error Block 16 end (CF ANALYSIS FAILED)
-		-- -- KONSTANTERROR: [124] 90. Error Block 15 start (CF ANALYSIS FAILED)
-		-- -- KONSTANTERROR: [124] 90. Error Block 15 end (CF ANALYSIS FAILED)
-	-- end;
-	-- Eat = function(arg1) -- Line 231, Named "Eat"
-		-- --[[ Upvalues[1]:
-			-- [1]: var16_upvw (read and write)
-		-- ]]
-		-- var16_upvw = 0
-		-- arg1:FireServer()
-	-- end;
-	-- Throw = function(arg1) -- Line 235, Named "Throw"
-		-- --[[ Upvalues[2]:
-			-- [1]: CurrentChunk_upvr (readonly)
-			-- [2]: UserGameSettings_upvr (readonly)
-		-- ]]
-		-- if CurrentChunk_upvr.Value and (not CurrentChunk_upvr.Value:FindFirstChild("Size") or CurrentChunk_upvr.Value:FindFirstChild("Humanoid")) then
-			-- UserGameSettings_upvr.RotationType = Enum.RotationType.CameraRelative
-		-- end
-		-- arg1:FireServer()
-	-- end;
--- }
--- local var62_upvw
--- CurrentChunk_upvr.Changed:Connect(function(arg1) -- Line 245
-	-- --[[ Upvalues[7]:
-		-- [1]: UserGameSettings_upvr (readonly)
-		-- [2]: var62_upvw (read and write)
-		-- [3]: var28_upvw (read and write)
-		-- [4]: var16_upvw (read and write)
-		-- [5]: Value_upvw_2 (read and write)
-		-- [6]: Debris_upvr (readonly)
-		-- [7]: var26_upvw (read and write)
-	-- ]]
-	-- UserGameSettings_upvr.RotationType = Enum.RotationType.MovementRelative
-	-- if var62_upvw then
-		-- var62_upvw:Disconnect()
-	-- end
-	-- if not arg1 then
-	-- else
-		-- if not var28_upvw then return end
-		-- var16_upvw = 0
-		-- Value_upvw_2 = arg1
-		-- local var63_upvw
-		-- if Value_upvw_2:FindFirstChild("PullParticles") and 2 < #Value_upvw_2.PullParticles:GetChildren() then
-			-- var63_upvw = 2
-		-- end
-		-- if Value_upvw_2.Name ~= "TemplateChunk" then
-			-- print("found humanoid!")
-			-- var62_upvw = Value_upvw_2.ChildRemoved:Connect(function(arg1_4) -- Line 260
-				-- --[[ Upvalues[3]:
-					-- [1]: var16_upvw (copied, read and write)
-					-- [2]: Value_upvw_2 (copied, read and write)
-					-- [3]: Debris_upvr (copied, readonly)
-				-- ]]
-				-- if 15 < var16_upvw then
-				-- else
-					-- var16_upvw += 1
-					-- if not arg1_4:IsA("BasePart") then return end
-					-- if not Value_upvw_2.PrimaryPart then return end
-					-- local Part_upvr = Instance.new("Part")
-					-- Part_upvr.Size = arg1_4.Size
-					-- Part_upvr.Color = arg1_4.Color
-					-- Part_upvr.Parent = workspace
-					-- Part_upvr.CFrame = arg1_4.CFrame
-					-- Part_upvr.Transparency = 0
-					-- Debris_upvr:AddItem(Part_upvr, math.random(2, 3))
-					-- local clone_3 = game.ReplicatedStorage.BiteParticle:Clone()
-					-- Part_upvr.Orientation = Vector3.new(0, 0, 0)
-					-- clone_3.Parent = Part_upvr
-					-- clone_3.Color = ColorSequence.new(Part_upvr.Color)
-					-- clone_3:Emit(7)
-					-- Part_upvr.Size /= 2
-					-- Part_upvr.CanCollide = false
-					-- Part_upvr.CanQuery = false
-					-- Part_upvr.CanTouch = false
-					-- task.delay(0.2, function() -- Line 287
-						-- --[[ Upvalues[1]:
-							-- [1]: Part_upvr (readonly)
-						-- ]]
-						-- Part_upvr.CanCollide = true
-					-- end)
-					-- local var68 = ((Part_upvr.Position - Value_upvw_2.PrimaryPart.Position) * Vector3.new(1, 0, 1) + Vector3.new(0, 7, 0)) * Part_upvr.Mass
-					-- Part_upvr:ApplyImpulse(var68 * 5)
-					-- Part_upvr:ApplyAngularImpulse(Vector3.new(var68.Z, 0, var68.X))
-				-- end
-			-- end)
-			-- return
-		-- end
-		-- var62_upvw = Value_upvw_2.DescendantRemoving:Connect(function(arg1_5) -- Line 297
-			-- --[[ Upvalues[5]:
-				-- [1]: var16_upvw (copied, read and write)
-				-- [2]: var26_upvw (copied, read and write)
-				-- [3]: Value_upvw_2 (copied, read and write)
-				-- [4]: Debris_upvr (copied, readonly)
-				-- [5]: var63_upvw (read and write)
-			-- ]]
-			-- if not arg1_5:IsA("BasePart") then
-			-- else
-				-- if var26_upvw < var16_upvw then return end
-				-- var16_upvw += 1
-				-- local clone_2_upvr = arg1_5:Clone()
-				-- clone_2_upvr.Parent = workspace
-				-- Debris_upvr:AddItem(clone_2_upvr, math.random(2, 3))
-				-- if 0.5 < math.random() and 1 < var63_upvw then
-					-- clone_2_upvr:ClearAllChildren()
-					-- clone_2_upvr.Size /= 2
-					-- task.delay(0.2, function() -- Line 316
-						-- --[[ Upvalues[1]:
-							-- [1]: clone_2_upvr (readonly)
-						-- ]]
-						-- clone_2_upvr.CanCollide = true
-					-- end)
-					-- local var72 = ((clone_2_upvr.Position - Value_upvw_2.PrimaryPart.Position) * Vector3.new(1, 0, 1) + Vector3.new(0, 7, 0)) * clone_2_upvr.Mass
-					-- clone_2_upvr:ApplyImpulse(var72 * 5)
-					-- clone_2_upvr:ApplyAngularImpulse(Vector3.new(var72.Z, 0, var72.X))
-					-- return
-				-- end
-				-- clone_2_upvr.Transparency = 1
-				-- if 0.5 >= math.random() then
-				-- else
-				-- end
-				-- local clone = game.ReplicatedStorage.BiteParticle:Clone()
-				-- clone_2_upvr.Orientation = Vector3.new(0, 0, 0)
-				-- clone.Parent = clone_2_upvr
-				-- clone.Color = ColorSequence.new(clone_2_upvr.Color)
-				-- clone:Emit(10)
-			-- end
-		-- end)
-	-- end
--- end)
--- function initEvent(arg1) -- Line 345
-	-- --[[ Upvalues[2]:
-		-- [1]: tbl_upvr (readonly)
-		-- [2]: tbl_2_upvr (readonly)
-	-- ]]
-	-- local SOME_upvr = script.Parent.Events:FindFirstChild(arg1.Name)
-	-- if SOME_upvr then
-		-- local var75_upvr = tbl_upvr[arg1.Name]
-		-- local var76
-		-- if var75_upvr then
-			-- var76 = arg1.Event:Connect(function() -- Line 351
-				-- --[[ Upvalues[2]:
-					-- [1]: var75_upvr (readonly)
-					-- [2]: SOME_upvr (readonly)
-				-- ]]
-				-- var75_upvr(SOME_upvr)
-			-- end)
-		-- else
-			-- var76 = arg1.Event:Connect(function() -- Line 356
-				-- --[[ Upvalues[1]:
-					-- [1]: SOME_upvr (readonly)
-				-- ]]
-				-- SOME_upvr:FireServer()
-			-- end)
-		-- end
-		-- table.insert(tbl_2_upvr, var76)
-	-- end
--- end
--- for _, v in ipairs(game.ReplicatedStorage.LocalEvents:GetChildren()) do
-	-- initEvent(v)
--- end
--- game.ReplicatedStorage.LocalEvents.ChildAdded:Connect(initEvent)
--- local RaycastParams_new_result1_upvr = RaycastParams.new()
--- RaycastParams_new_result1_upvr.FilterType = Enum.RaycastFilterType.Whitelist
--- RaycastParams_new_result1_upvr.FilterDescendantsInstances = {workspace.Map}
--- local OverlapParams_new_result1_upvr_2 = OverlapParams.new()
--- OverlapParams_new_result1_upvr_2.FilterType = Enum.RaycastFilterType.Whitelist
--- OverlapParams_new_result1_upvr_2.FilterDescendantsInstances = {workspace.Map}
--- local Loading_upvw = workspace:FindFirstChild("Loading")
--- local MapTime_upvr = game.ReplicatedStorage.ServerSettings.MapTime
--- workspace.ChildAdded:Connect(function(arg1) -- Line 378
-	-- --[[ Upvalues[2]:
-		-- [1]: MapTime_upvr (readonly)
-		-- [2]: Loading_upvw (read and write)
-	-- ]]
-	-- if arg1.Name == "Loading" then
-		-- wait(MapTime_upvr.Value + 2)
-		-- Loading_upvw = arg1
-	-- end
--- end)
--- local Value_upvw = game.ReplicatedStorage.ServerSettings.MapDuration.Value
--- game.ReplicatedStorage.ServerSettings.MapDuration.Changed:Connect(function(arg1) -- Line 385
-	-- --[[ Upvalues[1]:
-		-- [1]: Value_upvw (read and write)
-	-- ]]
-	-- Value_upvw = arg1
--- end)
--- local var91_upvw = 100
--- local var92_upvw = 100
--- function updateMap(arg1) -- Line 393
-	-- --[[ Upvalues[2]:
-		-- [1]: var91_upvw (read and write)
-		-- [2]: var92_upvw (read and write)
-	-- ]]
-	-- local Bedrock = workspace.Map:WaitForChild("Bedrock", 10)
-	-- if Bedrock then
-		-- var91_upvw = Bedrock.Size.X / 2
-		-- var92_upvw = Bedrock.Size.Z / 2
-	-- end
--- end
--- game.ReplicatedStorage.ServerSettings.MapName.Changed:Connect(updateMap)
--- local var95_upvw
--- game.ReplicatedStorage.ServerSettings.MapTime.Changed:Connect(function(arg1) -- Line 406
-	-- --[[ Upvalues[5]:
-		-- [1]: var95_upvw (read and write)
-		-- [2]: HumanoidRootPart_upvr (readonly)
-		-- [3]: Value_upvw (read and write)
-		-- [4]: var91_upvw (read and write)
-		-- [5]: var92_upvw (read and write)
-	-- ]]
-	-- var95_upvw = arg1
-	-- if HumanoidRootPart_upvr.Position.Y < 0 and (Value_upvw - 15 < arg1 or math.abs(HumanoidRootPart_upvr.Position.X) < var91_upvw and math.abs(HumanoidRootPart_upvr.Position.Z) < var92_upvw) then
-		-- HumanoidRootPart_upvr.CFrame = CFrame.new(Vector3.new(0, 100, 0))
-	-- end
--- end)
--- local any_Connect_result1_upvw = game["Run Service"].Heartbeat:Connect(function() -- Line 419
-	-- --[[ Upvalues[8]:
-		-- [1]: Humanoid_upvr (readonly)
-		-- [2]: var48_upvw (read and write)
-		-- [3]: Part_upvr_2 (readonly)
-		-- [4]: RaycastParams_new_result1_upvr (readonly)
-		-- [5]: OverlapParams_new_result1_upvr_2 (readonly)
-		-- [6]: var47_upvw (read and write)
-		-- [7]: HumanoidRootPart_upvr (readonly)
-		-- [8]: Loading_upvw (read and write)
-	-- ]]
-	-- if Humanoid_upvr:GetState() == Enum.HumanoidStateType.Running then
-		-- var48_upvw = true
-		-- local workspace_Raycast_result1 = workspace:Raycast(Part_upvr_2.Attachment.WorldPosition, Part_upvr_2.CFrame.LookVector, RaycastParams_new_result1_upvr)
-		-- if workspace_Raycast_result1 then
-			-- if #workspace:GetPartBoundsInBox(Part_upvr_2.Attachment.WorldCFrame, Vector3.new(Part_upvr_2.Size.X, Part_upvr_2.Size.Y, 0.1), OverlapParams_new_result1_upvr_2) == 0 then
-				-- Part_upvr_2.CanCollide = true
-			-- end
-			-- if workspace_Raycast_result1.Distance < 0.2 then
-				-- var47_upvw = true
-				-- -- KONSTANTWARNING: GOTO [79] #57
-			-- end
-		-- else
-			-- var47_upvw = false
-		-- end
-	-- else
-		-- var48_upvw = false
-		-- var47_upvw = false
-		-- Part_upvr_2.CanCollide = false
-	-- end
-	-- if 5000 < HumanoidRootPart_upvr.Position.Magnitude then
-		-- HumanoidRootPart_upvr.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-		-- HumanoidRootPart_upvr.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-		-- HumanoidRootPart_upvr.CFrame = CFrame.new(0, 300, 0)
-	-- end
-	-- if not Loading_upvw then
-	-- else
-		-- if not Loading_upvw.Parent then return end
-		-- if HumanoidRootPart_upvr.Position.Y < Loading_upvw.Position.Y then
-			-- HumanoidRootPart_upvr.CFrame = CFrame.new(Vector3.new(Loading_upvw.Position.X, Loading_upvw.Position.Y + HumanoidRootPart_upvr.Size.Y + Humanoid_upvr.HipHeight, Loading_upvw.Position.Z))
-		-- end
-	-- end
--- end)
--- function disconnect() -- Line 455
-	-- --[[ Upvalues[3]:
-		-- [1]: var46_upvw (read and write)
-		-- [2]: any_Connect_result1_upvw (read and write)
-		-- [3]: tbl_2_upvr (readonly)
-	-- ]]
-	-- if var46_upvw then
-		-- var46_upvw:Disconnect()
-	-- end
-	-- if any_Connect_result1_upvw then
-		-- any_Connect_result1_upvw:Disconnect()
-	-- end
-	-- for _, v_2 in ipairs(tbl_2_upvr) do
-		-- if v_2 then
-			-- v_2:Disconnect()
-		-- end
-	-- end
--- end
--- Humanoid_upvr.Died:Connect(disconnect)
--- Parent_upvr.LowerTorso.ChildAdded:Connect(function(arg1) -- Line 473
-	-- --[[ Upvalues[1]:
-		-- [1]: HumanoidRootPart_upvr (readonly)
-	-- ]]
-	-- if arg1:IsA("BallSocketConstraint") then
-		-- HumanoidRootPart_upvr.Anchored = false
-	-- end
--- end)
--- Parent_upvr.AncestryChanged:Connect(function() -- Line 479
-	-- --[[ Upvalues[1]:
-		-- [1]: Parent_upvr (readonly)
-	-- ]]
-	-- if Parent_upvr.Parent ~= workspace then
-		-- disconnect()
-	-- end
--- end)
--- game.ReplicatedStorage.Events.Teleport.OnClientEvent:Connect(function(arg1) -- Line 485
-	-- --[[ Upvalues[1]:
-		-- [1]: HumanoidRootPart_upvr (readonly)
-	-- ]]
-	-- if not arg1 or not HumanoidRootPart_upvr then
-	-- else
-		-- HumanoidRootPart_upvr.CFrame = arg1
-	-- end
--- end)
+createSmallButton("重置功能", Color3.fromRGB(220, 53, 69), "🔄", UDim2.new(0, 87.5, 0, eatWorldY + 90), function()
+    resetAllFeatures()
+end)
