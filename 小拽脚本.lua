@@ -1,5 +1,5 @@
--- ROBLOX 悬浮窗 UI
--- 现代化设计的游戏开发工具界面
+-- ROBLOX 鎮诞绐?UI
+-- 鐜颁唬鍖栬璁＄殑娓告垙寮€鍙戝伐鍏风晫闈?
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -10,7 +10,7 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- 配置保存
+-- 閰嶇疆淇濆瓨
 local savedConfig = {
     flySpeed = 50,
     walkSpeed = 16,
@@ -23,7 +23,7 @@ local savedConfig = {
 local function saveConfig()
     pcall(function()
         writefile("XiaoZhuaiScript_Config.json", HttpService:JSONEncode(savedConfig))
-        print("✅ 配置已保存")
+        print("鉁?閰嶇疆宸蹭繚瀛?)
     end)
 end
 
@@ -31,28 +31,28 @@ local function loadConfig()
     pcall(function()
         if isfile("XiaoZhuaiScript_Config.json") then
             savedConfig = HttpService:JSONDecode(readfile("XiaoZhuaiScript_Config.json"))
-            print("✅ 配置已加载")
+            print("鉁?閰嶇疆宸插姞杞?)
         end
     end)
 end
 
 loadConfig()
 
--- 重置人物状态函数
+-- 閲嶇疆浜虹墿鐘舵€佸嚱鏁?
 local function resetPlayerState()
     if player.Character then
         local character = player.Character
         local humanoid = character:FindFirstChild("Humanoid")
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         
-        -- 重置移动速度
+        -- 閲嶇疆绉诲姩閫熷害
         if humanoid then
             humanoid.WalkSpeed = 16
             humanoid.JumpPower = 50
             humanoid.PlatformStand = false
         end
         
-        -- 清除所有飞行相关的BodyVelocity和BodyAngularVelocity
+        -- 娓呴櫎鎵€鏈夐琛岀浉鍏崇殑BodyVelocity鍜孊odyAngularVelocity
         if rootPart then
             for _, obj in pairs(rootPart:GetChildren()) do
                 if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
@@ -61,7 +61,7 @@ local function resetPlayerState()
             end
         end
         
-        -- 清除其他可能的修改
+        -- 娓呴櫎鍏朵粬鍙兘鐨勪慨鏀?
         for _, part in pairs(character:GetChildren()) do
             if part:IsA("BasePart") then
                 for _, obj in pairs(part:GetChildren()) do
@@ -72,18 +72,18 @@ local function resetPlayerState()
             end
         end
         
-        print("人物状态已重置")
+        print("浜虹墿鐘舵€佸凡閲嶇疆")
     end
 end
 
--- 删除之前的悬浮窗实例并重置状态
+-- 鍒犻櫎涔嬪墠鐨勬偓娴獥瀹炰緥骞堕噸缃姸鎬?
 for _, gui in pairs(playerGui:GetChildren()) do
     if gui.Name == "FloatingUI" then
         gui:Destroy()
     end
 end
 
--- 重置人物状态（但不重置速度）
+-- 閲嶇疆浜虹墿鐘舵€侊紙浣嗕笉閲嶇疆閫熷害锛?
 if player.Character then
     local character = player.Character
     local humanoid = character:FindFirstChild("Humanoid")
@@ -113,25 +113,25 @@ if player.Character then
     end
 end
 
--- 应用保存的配置
+-- 搴旂敤淇濆瓨鐨勯厤缃?
 if player.Character and player.Character:FindFirstChild("Humanoid") then
     player.Character.Humanoid.WalkSpeed = savedConfig.walkSpeed
-    print("✅ 已应用保存的速度: " .. savedConfig.walkSpeed)
+    print("鉁?宸插簲鐢ㄤ繚瀛樼殑閫熷害: " .. savedConfig.walkSpeed)
 end
 
 player.CharacterAdded:Connect(function(character)
     character:WaitForChild("Humanoid").WalkSpeed = savedConfig.walkSpeed
-    print("✅ 角色重生，已应用保存的速度: " .. savedConfig.walkSpeed)
+    print("鉁?瑙掕壊閲嶇敓锛屽凡搴旂敤淇濆瓨鐨勯€熷害: " .. savedConfig.walkSpeed)
 end)
 
--- 创建主界面
+-- 鍒涘缓涓荤晫闈?
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FloatingUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 screenGui.Parent = playerGui
 
--- 窗口层级管理
+-- 绐楀彛灞傜骇绠＄悊
 local currentZIndex = 1
 local function bringToFront(frame)
     currentZIndex = currentZIndex + 1
@@ -143,13 +143,13 @@ local function bringToFront(frame)
     end
 end
 
--- 创建缩放手柄函数
+-- 鍒涘缓缂╂斁鎵嬫焺鍑芥暟
 local function createResizeHandle(frame)
     local resizeHandle = Instance.new("TextButton")
     resizeHandle.Size = UDim2.new(0, 20, 0, 20)
     resizeHandle.Position = UDim2.new(1, -20, 1, -20)
     resizeHandle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    resizeHandle.Text = "⟲"
+    resizeHandle.Text = "鉄?
     resizeHandle.TextColor3 = Color3.fromRGB(255, 255, 255)
     resizeHandle.TextSize = 12
     resizeHandle.Font = Enum.Font.GothamBold
@@ -198,7 +198,7 @@ local function createResizeHandle(frame)
     end)
 end
 
--- 主窗口框架
+-- 涓荤獥鍙ｆ鏋?
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 350, 0, 450)
@@ -209,28 +209,28 @@ mainFrame.Active = true
 mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
--- 主窗口点击置顶
+-- 涓荤獥鍙ｇ偣鍑荤疆椤?
 mainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         bringToFront(mainFrame)
     end
 end)
 
--- 添加圆角和光带效果（去掉灰色阴影）
+-- 娣诲姞鍦嗚鍜屽厜甯︽晥鏋滐紙鍘绘帀鐏拌壊闃村奖锛?
 local corner = Instance.new("UICorner")
 corner.CornerRadius = UDim.new(0, 12)
 corner.Parent = mainFrame
 
--- 流动光带边框
+-- 娴佸姩鍏夊甫杈规
 local lightBorder = Instance.new("UIStroke")
 lightBorder.Color = Color3.fromRGB(savedConfig.borderColor[1], savedConfig.borderColor[2], savedConfig.borderColor[3])
 lightBorder.Thickness = 3
 lightBorder.Parent = mainFrame
 
--- 主窗口缩放手柄
+-- 涓荤獥鍙ｇ缉鏀炬墜鏌?
 createResizeHandle(mainFrame)
 
--- 标题栏
+-- 鏍囬鏍?
 local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -243,7 +243,7 @@ local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = titleBar
 
--- 缩小时的当前时间显示（左边）
+-- 缂╁皬鏃剁殑褰撳墠鏃堕棿鏄剧ず锛堝乏杈癸級
 local minimizedTime = Instance.new("TextLabel")
 minimizedTime.Size = UDim2.new(0, 60, 1, 0)
 minimizedTime.Position = UDim2.new(0, 10, 0, 0)
@@ -255,19 +255,19 @@ minimizedTime.Font = Enum.Font.GothamBold
 minimizedTime.Visible = false
 minimizedTime.Parent = titleBar
 
--- 标题文本（居中）
+-- 鏍囬鏂囨湰锛堝眳涓級
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "TitleLabel"
 titleLabel.Size = UDim2.new(1, -200, 1, 0)
 titleLabel.Position = UDim2.new(0, 100, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "小拽脚本"
+titleLabel.Text = "灏忔嫿鑴氭湰"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextScaled = true
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.Parent = titleBar
 
--- 缩小时的FPS显示（右边）
+-- 缂╁皬鏃剁殑FPS鏄剧ず锛堝彸杈癸級
 local minimizedFPS = Instance.new("TextLabel")
 minimizedFPS.Size = UDim2.new(0, 60, 1, 0)
 minimizedFPS.Position = UDim2.new(1, -130, 0, 0)
@@ -279,13 +279,13 @@ minimizedFPS.Font = Enum.Font.GothamBold
 minimizedFPS.Visible = false
 minimizedFPS.Parent = titleBar
 
--- 最小化按钮
+-- 鏈€灏忓寲鎸夐挳
 local minimizeBtn = Instance.new("TextButton")
 minimizeBtn.Name = "MinimizeButton"
 minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
 minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
 minimizeBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-minimizeBtn.Text = "—"
+minimizeBtn.Text = "鈥?
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 minimizeBtn.TextScaled = true
 minimizeBtn.Font = Enum.Font.GothamBold
@@ -296,13 +296,13 @@ local minimizeCorner = Instance.new("UICorner")
 minimizeCorner.CornerRadius = UDim.new(0.5, 0)
 minimizeCorner.Parent = minimizeBtn
 
--- 关闭按钮
+-- 鍏抽棴鎸夐挳
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseButton"
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
 closeBtn.Position = UDim2.new(1, -35, 0, 5)
 closeBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-closeBtn.Text = "✕"
+closeBtn.Text = "鉁?
 closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 closeBtn.TextScaled = true
 closeBtn.Font = Enum.Font.GothamBold
@@ -313,7 +313,7 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0, 6)
 closeCorner.Parent = closeBtn
 
--- 内容区域
+-- 鍐呭鍖哄煙
 local contentFrame = Instance.new("Frame")
 contentFrame.Name = "ContentFrame"
 contentFrame.Size = UDim2.new(1, -20, 1, -60)
@@ -321,7 +321,7 @@ contentFrame.Position = UDim2.new(0, 10, 0, 50)
 contentFrame.BackgroundTransparency = 1
 contentFrame.Parent = mainFrame
 
--- 游戏信息区域（上半部分）
+-- 娓告垙淇℃伅鍖哄煙锛堜笂鍗婇儴鍒嗭級
 local infoFrame = Instance.new("Frame")
 infoFrame.Name = "InfoFrame"
 infoFrame.Size = UDim2.new(1, 0, 0, 150)
@@ -334,69 +334,69 @@ local infoCorner = Instance.new("UICorner")
 infoCorner.CornerRadius = UDim.new(0, 8)
 infoCorner.Parent = infoFrame
 
--- 信息标题
+-- 淇℃伅鏍囬
 local infoTitle = Instance.new("TextLabel")
 infoTitle.Name = "InfoTitle"
 infoTitle.Size = UDim2.new(1, -20, 0, 25)
 infoTitle.Position = UDim2.new(0, 10, 0, 5)
 infoTitle.BackgroundTransparency = 1
-infoTitle.Text = "📊 游戏信息"
+infoTitle.Text = "馃搳 娓告垙淇℃伅"
 infoTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 infoTitle.TextScaled = true
 infoTitle.Font = Enum.Font.GothamBold
 infoTitle.Parent = infoFrame
 
--- 玩家信息
+-- 鐜╁淇℃伅
 local playerInfo = Instance.new("TextLabel")
 playerInfo.Name = "PlayerInfo"
 playerInfo.Size = UDim2.new(1, -20, 0, 25)
 playerInfo.Position = UDim2.new(0, 10, 0, 30)
 playerInfo.BackgroundTransparency = 1
-playerInfo.Text = "玩家: " .. player.Name
+playerInfo.Text = "鐜╁: " .. player.Name
 playerInfo.TextColor3 = Color3.fromRGB(200, 200, 200)
 playerInfo.TextScaled = true
 playerInfo.Font = Enum.Font.Gotham
 playerInfo.TextXAlignment = Enum.TextXAlignment.Left
 playerInfo.Parent = infoFrame
 
--- FPS显示
+-- FPS鏄剧ず
 local fpsLabel = Instance.new("TextLabel")
 fpsLabel.Name = "FPSLabel"
 fpsLabel.Size = UDim2.new(1, -20, 0, 25)
 fpsLabel.Position = UDim2.new(0, 10, 0, 55)
 fpsLabel.BackgroundTransparency = 1
-fpsLabel.Text = "帧率: 60 FPS"
+fpsLabel.Text = "甯х巼: 60 FPS"
 fpsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
 fpsLabel.TextScaled = true
 fpsLabel.Font = Enum.Font.Gotham
 fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
 fpsLabel.Parent = infoFrame
 
--- 移动速度显示
+-- 绉诲姩閫熷害鏄剧ず
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Size = UDim2.new(1, -20, 0, 25)
 speedLabel.Position = UDim2.new(0, 10, 0, 80)
 speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "速度: 16"
+speedLabel.Text = "閫熷害: 16"
 speedLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 speedLabel.TextScaled = true
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextXAlignment = Enum.TextXAlignment.Left
 speedLabel.Parent = infoFrame
 
--- 当前时间显示
+-- 褰撳墠鏃堕棿鏄剧ず
 local currentTimeLabel = Instance.new("TextLabel")
 currentTimeLabel.Size = UDim2.new(1, -20, 0, 25)
 currentTimeLabel.Position = UDim2.new(0, 10, 0, 105)
 currentTimeLabel.BackgroundTransparency = 1
-currentTimeLabel.Text = "时间: 12:00:00"
+currentTimeLabel.Text = "鏃堕棿: 12:00:00"
 currentTimeLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
 currentTimeLabel.TextScaled = true
 currentTimeLabel.Font = Enum.Font.Gotham
 currentTimeLabel.TextXAlignment = Enum.TextXAlignment.Left
 currentTimeLabel.Parent = infoFrame
 
--- 功能按钮区域（下半部分，两列布局）
+-- 鍔熻兘鎸夐挳鍖哄煙锛堜笅鍗婇儴鍒嗭紝涓ゅ垪甯冨眬锛?
 local buttonFrame = Instance.new("Frame")
 buttonFrame.Name = "ButtonFrame"
 buttonFrame.Size = UDim2.new(1, 0, 0, 120)
@@ -404,13 +404,13 @@ buttonFrame.Position = UDim2.new(0, 0, 0, 160)
 buttonFrame.BackgroundTransparency = 1
 buttonFrame.Parent = contentFrame
 
--- 飞行变量
+-- 椋炶鍙橀噺
 local flying = false
 local bodyVelocity = nil
 local bodyAngularVelocity = nil
 local flySpeed = savedConfig.flySpeed or 50
 
--- 飞行功能
+-- 椋炶鍔熻兘
 local function toggleFly()
     flying = not flying
     
@@ -428,7 +428,7 @@ local function toggleFly()
             bodyAngularVelocity.AngularVelocity = Vector3.new(0, 0, 0)
             bodyAngularVelocity.Parent = rootPart
             
-            print("飞行模式已开启")
+            print("椋炶妯″紡宸插紑鍚?)
         end
     else
         if bodyVelocity then 
@@ -439,11 +439,11 @@ local function toggleFly()
             bodyAngularVelocity:Destroy()
             bodyAngularVelocity = nil
         end
-        print("飞行模式已关闭")
+        print("椋炶妯″紡宸插叧闂?)
     end
 end
 
--- 屏幕左侧飞行控制按钮（可拖动，不可缩放）
+-- 灞忓箷宸︿晶椋炶鎺у埗鎸夐挳锛堝彲鎷栧姩锛屼笉鍙缉鏀撅級
 local leftControlFrame = Instance.new("Frame")
 leftControlFrame.Size = UDim2.new(0, 200, 0, 230)
 leftControlFrame.Position = UDim2.new(0, 10, 0.5, -115)
@@ -453,25 +453,25 @@ leftControlFrame.Active = true
 leftControlFrame.Draggable = true
 leftControlFrame.Parent = screenGui
 
--- 飞行控制窗口点击置顶
+-- 椋炶鎺у埗绐楀彛鐐瑰嚮缃《
 leftControlFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         bringToFront(leftControlFrame)
     end
 end)
 
--- 飞行速度标签
+-- 椋炶閫熷害鏍囩
 local flySpeedLabel = Instance.new("TextLabel")
 flySpeedLabel.Size = UDim2.new(1, 0, 0, 20)
 flySpeedLabel.Position = UDim2.new(0, 0, 0, 0)
 flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.Text = "飞行速度: " .. flySpeed
+flySpeedLabel.Text = "椋炶閫熷害: " .. flySpeed
 flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 flySpeedLabel.TextSize = 12
 flySpeedLabel.Font = Enum.Font.Gotham
 flySpeedLabel.Parent = leftControlFrame
 
--- 飞行速度输入框
+-- 椋炶閫熷害杈撳叆妗?
 local flySpeedInput = Instance.new("TextBox")
 flySpeedInput.Size = UDim2.new(0, 80, 0, 25)
 flySpeedInput.Position = UDim2.new(0, 10, 0, 20)
@@ -490,7 +490,7 @@ local flySpeedSetBtn = Instance.new("TextButton")
 flySpeedSetBtn.Size = UDim2.new(0, 60, 0, 25)
 flySpeedSetBtn.Position = UDim2.new(0, 100, 0, 20)
 flySpeedSetBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
-flySpeedSetBtn.Text = "设置"
+flySpeedSetBtn.Text = "璁剧疆"
 flySpeedSetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 flySpeedSetBtn.TextSize = 12
 flySpeedSetBtn.Font = Enum.Font.GothamBold
@@ -504,7 +504,7 @@ flySpeedSetBtn.MouseButton1Click:Connect(function()
     local newSpeed = tonumber(flySpeedInput.Text)
     if newSpeed and newSpeed > 0 then
         flySpeed = newSpeed
-        flySpeedLabel.Text = "飞行速度: " .. flySpeed
+        flySpeedLabel.Text = "椋炶閫熷害: " .. flySpeed
         savedConfig.flySpeed = flySpeed
         saveConfig()
     else
@@ -512,12 +512,12 @@ flySpeedSetBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- 开启/关闭飞天按钮（最上方中央）
+-- 寮€鍚?鍏抽棴椋炲ぉ鎸夐挳锛堟渶涓婃柟涓ぎ锛?
 local toggleFlyBtn = Instance.new("TextButton")
 toggleFlyBtn.Size = UDim2.new(0, 120, 0, 35)
 toggleFlyBtn.Position = UDim2.new(0, 40, 0, 50)
 toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
-toggleFlyBtn.Text = "开启飞天"
+toggleFlyBtn.Text = "寮€鍚澶?
 toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 toggleFlyBtn.TextSize = 14
 toggleFlyBtn.Font = Enum.Font.GothamBold
@@ -528,12 +528,12 @@ local toggleFlyCorner = Instance.new("UICorner")
 toggleFlyCorner.CornerRadius = UDim.new(0, 8)
 toggleFlyCorner.Parent = toggleFlyBtn
 
--- 上下控制（左边）
+-- 涓婁笅鎺у埗锛堝乏杈癸級
 local upBtn = Instance.new("TextButton")
 upBtn.Size = UDim2.new(0, 80, 0, 40)
 upBtn.Position = UDim2.new(0, 0, 0, 95)
 upBtn.BackgroundColor3 = Color3.fromRGB(0, 123, 255)
-upBtn.Text = "上升\n(空格)"
+upBtn.Text = "涓婂崌\n(绌烘牸)"
 upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 upBtn.TextSize = 12
 upBtn.Font = Enum.Font.GothamBold
@@ -548,7 +548,7 @@ local downBtn = Instance.new("TextButton")
 downBtn.Size = UDim2.new(0, 80, 0, 40)
 downBtn.Position = UDim2.new(0, 0, 0, 145)
 downBtn.BackgroundColor3 = Color3.fromRGB(0, 123, 255)
-downBtn.Text = "下降\n(C键)"
+downBtn.Text = "涓嬮檷\n(C閿?"
 downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 downBtn.TextSize = 12
 downBtn.Font = Enum.Font.GothamBold
@@ -559,12 +559,12 @@ local downCorner = Instance.new("UICorner")
 downCorner.CornerRadius = UDim.new(0, 8)
 downCorner.Parent = downBtn
 
--- 前后控制（右边）
+-- 鍓嶅悗鎺у埗锛堝彸杈癸級
 local forwardBtn = Instance.new("TextButton")
 forwardBtn.Size = UDim2.new(0, 80, 0, 40)
 forwardBtn.Position = UDim2.new(0, 100, 0, 95)
 forwardBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
-forwardBtn.Text = "前进\n(W键)"
+forwardBtn.Text = "鍓嶈繘\n(W閿?"
 forwardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 forwardBtn.TextSize = 12
 forwardBtn.Font = Enum.Font.GothamBold
@@ -579,7 +579,7 @@ local backwardBtn = Instance.new("TextButton")
 backwardBtn.Size = UDim2.new(0, 80, 0, 40)
 backwardBtn.Position = UDim2.new(0, 100, 0, 145)
 backwardBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
-backwardBtn.Text = "后退\n(S键)"
+backwardBtn.Text = "鍚庨€€\n(S閿?"
 backwardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 backwardBtn.TextSize = 12
 backwardBtn.Font = Enum.Font.GothamBold
@@ -590,27 +590,27 @@ local backwardCorner = Instance.new("UICorner")
 backwardCorner.CornerRadius = UDim.new(0, 8)
 backwardCorner.Parent = backwardBtn
 
--- 持续性飞行控制
+-- 鎸佺画鎬ч琛屾帶鍒?
 local flyingUp = false
 local flyingDown = false
 local flyingForward = false
 local flyingBackward = false
 
--- 开启/关闭飞天按钮
+-- 寮€鍚?鍏抽棴椋炲ぉ鎸夐挳
 toggleFlyBtn.MouseButton1Click:Connect(function()
     toggleFly()
     if flying then
-        toggleFlyBtn.Text = "关闭飞天"
+        toggleFlyBtn.Text = "鍏抽棴椋炲ぉ"
         toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
         toggleFlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     else
-        toggleFlyBtn.Text = "开启飞天"
+        toggleFlyBtn.Text = "寮€鍚澶?
         toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
         toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
     end
 end)
 
--- 上升按钮
+-- 涓婂崌鎸夐挳
 upBtn.MouseButton1Down:Connect(function()
     flyingUp = true
 end)
@@ -618,7 +618,7 @@ upBtn.MouseButton1Up:Connect(function()
     flyingUp = false
 end)
 
--- 下降按钮
+-- 涓嬮檷鎸夐挳
 downBtn.MouseButton1Down:Connect(function()
     flyingDown = true
 end)
@@ -626,7 +626,7 @@ downBtn.MouseButton1Up:Connect(function()
     flyingDown = false
 end)
 
--- 前进按钮
+-- 鍓嶈繘鎸夐挳
 forwardBtn.MouseButton1Down:Connect(function()
     flyingForward = true
 end)
@@ -634,7 +634,7 @@ forwardBtn.MouseButton1Up:Connect(function()
     flyingForward = false
 end)
 
--- 后退按钮
+-- 鍚庨€€鎸夐挳
 backwardBtn.MouseButton1Down:Connect(function()
     flyingBackward = true
 end)
@@ -642,7 +642,7 @@ backwardBtn.MouseButton1Up:Connect(function()
     flyingBackward = false
 end)
 
--- 飞行控制循环
+-- 椋炶鎺у埗寰幆
 local function flyControl()
     if not flying or not bodyVelocity then return end
     
@@ -655,7 +655,7 @@ local function flyControl()
     local camera = workspace.CurrentCamera
     local moveVector = Vector3.new(0, 0, 0)
     
-    -- 按钮控制
+    -- 鎸夐挳鎺у埗
     if flyingUp then
         moveVector = moveVector + Vector3.new(0, 1, 0)
     end
@@ -669,7 +669,7 @@ local function flyControl()
         moveVector = moveVector - camera.CFrame.LookVector
     end
     
-    -- 键盘控制（电脑专用）
+    -- 閿洏鎺у埗锛堢數鑴戜笓鐢級
     if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
         moveVector = moveVector + Vector3.new(0, 1, 0)
     end
@@ -692,10 +692,10 @@ local function flyControl()
     bodyVelocity.Velocity = moveVector * flySpeed
 end
 
--- 启动飞行控制循环
+-- 鍚姩椋炶鎺у埗寰幆
 RunService.Heartbeat:Connect(flyControl)
 
--- 移速设置窗口（可拖动，可缩放）
+-- 绉婚€熻缃獥鍙ｏ紙鍙嫋鍔紝鍙缉鏀撅級
 local speedWindow = Instance.new("Frame")
 speedWindow.Size = UDim2.new(0, 400, 0, 500)
 speedWindow.Position = UDim2.new(0, 370, 0, 20)
@@ -706,7 +706,7 @@ speedWindow.Active = true
 speedWindow.Draggable = true
 speedWindow.Parent = screenGui
 
--- 移速窗口点击置顶
+-- 绉婚€熺獥鍙ｇ偣鍑荤疆椤?
 speedWindow.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         bringToFront(speedWindow)
@@ -722,14 +722,14 @@ speedWindowBorder.Color = Color3.fromRGB(220, 53, 69)
 speedWindowBorder.Thickness = 2
 speedWindowBorder.Parent = speedWindow
 
--- 移速窗口缩放手柄
+-- 绉婚€熺獥鍙ｇ缉鏀炬墜鏌?
 createResizeHandle(speedWindow)
 
 local speedTitle = Instance.new("TextLabel")
 speedTitle.Size = UDim2.new(1, -25, 0, 30)
 speedTitle.Position = UDim2.new(0, 5, 0, 5)
 speedTitle.BackgroundTransparency = 1
-speedTitle.Text = "⚡ 移动速度设置"
+speedTitle.Text = "鈿?绉诲姩閫熷害璁剧疆"
 speedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedTitle.TextSize = 14
 speedTitle.Font = Enum.Font.GothamBold
@@ -739,7 +739,7 @@ local speedCloseBtn = Instance.new("TextButton")
 speedCloseBtn.Size = UDim2.new(0, 20, 0, 20)
 speedCloseBtn.Position = UDim2.new(1, -25, 0, 5)
 speedCloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-speedCloseBtn.Text = "×"
+speedCloseBtn.Text = "脳"
 speedCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedCloseBtn.TextSize = 12
 speedCloseBtn.BorderSizePixel = 0
@@ -749,7 +749,7 @@ local speedCloseBtnCorner = Instance.new("UICorner")
 speedCloseBtnCorner.CornerRadius = UDim.new(0, 3)
 speedCloseBtnCorner.Parent = speedCloseBtn
 
--- 滚动框
+-- 婊氬姩妗?
 local speedScrollFrame = Instance.new("ScrollingFrame")
 speedScrollFrame.Size = UDim2.new(1, -20, 1, -80)
 speedScrollFrame.Position = UDim2.new(0, 10, 0, 40)
@@ -758,7 +758,7 @@ speedScrollFrame.ScrollBarThickness = 8
 speedScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 1200)
 speedScrollFrame.Parent = speedWindow
 
--- 预设速度
+-- 棰勮閫熷害
 local speedValues = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 2000, 3000, 4000}
 
 for i, speed in ipairs(speedValues) do
@@ -766,7 +766,7 @@ for i, speed in ipairs(speedValues) do
     speedBtn.Size = UDim2.new(0, 180, 0, 35)
     speedBtn.Position = UDim2.new(0, 10 + ((i-1) % 2) * 190, 0, 10 + math.floor((i-1) / 2) * 45)
     speedBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-    speedBtn.Text = "速度: " .. speed
+    speedBtn.Text = "閫熷害: " .. speed
     speedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     speedBtn.TextSize = 12
     speedBtn.Font = Enum.Font.Gotham
@@ -782,12 +782,12 @@ for i, speed in ipairs(speedValues) do
             player.Character.Humanoid.WalkSpeed = speed
             savedConfig.walkSpeed = speed
             saveConfig()
-            print("移动速度已设置为: " .. speed)
+            print("绉诲姩閫熷害宸茶缃负: " .. speed)
         end
     end)
 end
 
--- 自定义移速区域
+-- 鑷畾涔夌Щ閫熷尯鍩?
 local customSpeedFrame = Instance.new("Frame")
 customSpeedFrame.Size = UDim2.new(1, -20, 0, 80)
 customSpeedFrame.Position = UDim2.new(0, 10, 0, 470)
@@ -803,7 +803,7 @@ local customSpeedLabel = Instance.new("TextLabel")
 customSpeedLabel.Size = UDim2.new(1, 0, 0, 25)
 customSpeedLabel.Position = UDim2.new(0, 0, 0, 5)
 customSpeedLabel.BackgroundTransparency = 1
-customSpeedLabel.Text = "自定义移速"
+customSpeedLabel.Text = "鑷畾涔夌Щ閫?
 customSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 customSpeedLabel.TextSize = 14
 customSpeedLabel.Font = Enum.Font.GothamBold
@@ -813,7 +813,7 @@ local customSpeedInput = Instance.new("TextBox")
 customSpeedInput.Size = UDim2.new(0, 200, 0, 30)
 customSpeedInput.Position = UDim2.new(0, 10, 0, 30)
 customSpeedInput.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-customSpeedInput.Text = "输入速度值"
+customSpeedInput.Text = "杈撳叆閫熷害鍊?
 customSpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 customSpeedInput.TextSize = 12
 customSpeedInput.Font = Enum.Font.Gotham
@@ -828,7 +828,7 @@ local customSpeedSetBtn = Instance.new("TextButton")
 customSpeedSetBtn.Size = UDim2.new(0, 80, 0, 30)
 customSpeedSetBtn.Position = UDim2.new(0, 220, 0, 30)
 customSpeedSetBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
-customSpeedSetBtn.Text = "设置"
+customSpeedSetBtn.Text = "璁剧疆"
 customSpeedSetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 customSpeedSetBtn.TextSize = 12
 customSpeedSetBtn.Font = Enum.Font.GothamBold
@@ -846,14 +846,14 @@ customSpeedSetBtn.MouseButton1Click:Connect(function()
             player.Character.Humanoid.WalkSpeed = speedValue
             savedConfig.walkSpeed = speedValue
             saveConfig()
-            print("自定义移动速度已设置为: " .. speedValue)
+            print("鑷畾涔夌Щ鍔ㄩ€熷害宸茶缃负: " .. speedValue)
         end
     else
-        print("请输入有效的数字")
+        print("璇疯緭鍏ユ湁鏁堢殑鏁板瓧")
     end
 end)
 
--- 颜色选择窗口（可拖动，可缩放）
+-- 棰滆壊閫夋嫨绐楀彛锛堝彲鎷栧姩锛屽彲缂╂斁锛?
 local colorWindow = Instance.new("Frame")
 colorWindow.Size = UDim2.new(0, 320, 0, 300)
 colorWindow.Position = UDim2.new(0, 370, 0, 20)
@@ -864,7 +864,7 @@ colorWindow.Active = true
 colorWindow.Draggable = true
 colorWindow.Parent = screenGui
 
--- 颜色窗口点击置顶
+-- 棰滆壊绐楀彛鐐瑰嚮缃《
 colorWindow.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         bringToFront(colorWindow)
@@ -880,14 +880,14 @@ colorWindowBorder.Color = Color3.fromRGB(138, 43, 226)
 colorWindowBorder.Thickness = 2
 colorWindowBorder.Parent = colorWindow
 
--- 颜色窗口缩放手柄
+-- 棰滆壊绐楀彛缂╂斁鎵嬫焺
 createResizeHandle(colorWindow)
 
 local colorTitle = Instance.new("TextLabel")
 colorTitle.Size = UDim2.new(1, -25, 0, 30)
 colorTitle.Position = UDim2.new(0, 5, 0, 5)
 colorTitle.BackgroundTransparency = 1
-colorTitle.Text = "🎨 自定义悬浮窗颜色"
+colorTitle.Text = "馃帹 鑷畾涔夋偓娴獥棰滆壊"
 colorTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
 colorTitle.TextSize = 14
 colorTitle.Font = Enum.Font.GothamBold
@@ -897,7 +897,7 @@ local colorCloseBtn = Instance.new("TextButton")
 colorCloseBtn.Size = UDim2.new(0, 20, 0, 20)
 colorCloseBtn.Position = UDim2.new(1, -25, 0, 5)
 colorCloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
-colorCloseBtn.Text = "×"
+colorCloseBtn.Text = "脳"
 colorCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 colorCloseBtn.TextSize = 12
 colorCloseBtn.BorderSizePixel = 0
@@ -907,20 +907,20 @@ local colorCloseBtnCorner = Instance.new("UICorner")
 colorCloseBtnCorner.CornerRadius = UDim.new(0, 3)
 colorCloseBtnCorner.Parent = colorCloseBtn
 
--- 更多颜色选择
+-- 鏇村棰滆壊閫夋嫨
 local colors = {
-    {Color3.fromRGB(100, 200, 255), "天空蓝"},
-    {Color3.fromRGB(255, 100, 100), "樱花红"},
-    {Color3.fromRGB(100, 255, 100), "翡翠绿"},
-    {Color3.fromRGB(255, 200, 100), "夕阳橙"},
-    {Color3.fromRGB(200, 100, 255), "薰衣紫"},
-    {Color3.fromRGB(255, 255, 100), "柠檬黄"},
-    {Color3.fromRGB(255, 150, 200), "粉玫瑰"},
-    {Color3.fromRGB(150, 255, 200), "薄荷绿"},
-    {Color3.fromRGB(200, 255, 150), "青草绿"},
-    {Color3.fromRGB(255, 200, 150), "蜜桃橙"},
-    {Color3.fromRGB(150, 200, 255), "海洋蓝"},
-    {Color3.fromRGB(255, 150, 255), "梦幻紫"}
+    {Color3.fromRGB(100, 200, 255), "澶╃┖钃?},
+    {Color3.fromRGB(255, 100, 100), "妯辫姳绾?},
+    {Color3.fromRGB(100, 255, 100), "缈＄繝缁?},
+    {Color3.fromRGB(255, 200, 100), "澶曢槼姗?},
+    {Color3.fromRGB(200, 100, 255), "钖拌。绱?},
+    {Color3.fromRGB(255, 255, 100), "鏌犳榛?},
+    {Color3.fromRGB(255, 150, 200), "绮夌帿鐟?},
+    {Color3.fromRGB(150, 255, 200), "钖勮嵎缁?},
+    {Color3.fromRGB(200, 255, 150), "闈掕崏缁?},
+    {Color3.fromRGB(255, 200, 150), "铚滄姗?},
+    {Color3.fromRGB(150, 200, 255), "娴锋磱钃?},
+    {Color3.fromRGB(255, 150, 255), "姊﹀够绱?}
 }
 
 for i, colorData in ipairs(colors) do
@@ -949,11 +949,11 @@ for i, colorData in ipairs(colors) do
         savedConfig.infoFrameColor = {math.floor(colorData[1].R * 0.6 * 255), math.floor(colorData[1].G * 0.6 * 255), math.floor(colorData[1].B * 0.6 * 255)}
         savedConfig.borderColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
         saveConfig()
-        print("颜色已更改为: " .. colorData[2])
+        print("棰滆壊宸叉洿鏀逛负: " .. colorData[2])
     end)
 end
 
--- 创建两列按钮函数
+-- 鍒涘缓涓ゅ垪鎸夐挳鍑芥暟
 local function createSmallButton(text, color, icon, position, callback)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0, 155, 0, 35)
@@ -987,27 +987,27 @@ local function createSmallButton(text, color, icon, position, callback)
     return button
 end
 
--- 创建两列三个按钮
-createSmallButton("飞行模式", Color3.fromRGB(0, 123, 255), "✈️", UDim2.new(0, 5, 0, 5), function()
+-- 鍒涘缓涓ゅ垪涓変釜鎸夐挳
+createSmallButton("椋炶妯″紡", Color3.fromRGB(0, 123, 255), "鉁堬笍", UDim2.new(0, 5, 0, 5), function()
     leftControlFrame.Visible = not leftControlFrame.Visible
 end)
 
-createSmallButton("移速设置", Color3.fromRGB(220, 53, 69), "⚡", UDim2.new(0, 170, 0, 5), function()
+createSmallButton("绉婚€熻缃?, Color3.fromRGB(220, 53, 69), "鈿?, UDim2.new(0, 170, 0, 5), function()
     speedWindow.Visible = not speedWindow.Visible
     colorWindow.Visible = false
 end)
 
-createSmallButton("自定义颜色", Color3.fromRGB(138, 43, 226), "🎨", UDim2.new(0, 87.5, 0, 50), function()
+createSmallButton("鑷畾涔夐鑹?, Color3.fromRGB(138, 43, 226), "馃帹", UDim2.new(0, 87.5, 0, 50), function()
     colorWindow.Visible = not colorWindow.Visible
     speedWindow.Visible = false
 end)
 
--- 功能实现
+-- 鍔熻兘瀹炵幇
 local isMinimized = false
 local frameCount = 0
 local lastTime = tick()
 
--- 光带颜色数组
+-- 鍏夊甫棰滆壊鏁扮粍
 local lightColors = {
     Color3.fromRGB(255, 100, 100),
     Color3.fromRGB(255, 200, 100),
@@ -1020,7 +1020,7 @@ local lightColors = {
 local colorIndex = 1
 local colorProgress = 0
 
--- 最小化功能
+-- 鏈€灏忓寲鍔熻兘
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     local targetSize = isMinimized and UDim2.new(0, 350, 0, 40) or UDim2.new(0, 350, 0, 450)
@@ -1028,18 +1028,18 @@ minimizeBtn.MouseButton1Click:Connect(function()
     tween:Play()
     
     contentFrame.Visible = not isMinimized
-    minimizeBtn.Text = isMinimized and "+" or "—"
+    minimizeBtn.Text = isMinimized and "+" or "鈥?
     minimizedFPS.Visible = isMinimized
     minimizedTime.Visible = isMinimized
 end)
 
--- 关闭功能
+-- 鍏抽棴鍔熻兘
 closeBtn.MouseButton1Click:Connect(function()
     if flying then 
         toggleFly()
         leftControlFrame.Visible = false
     end
-    -- 关闭时重置人物状态
+    -- 鍏抽棴鏃堕噸缃汉鐗╃姸鎬?
     resetPlayerState()
     local tween = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
         Size = UDim2.new(0, 0, 0, 0),
@@ -1060,36 +1060,36 @@ colorCloseBtn.MouseButton1Click:Connect(function()
     colorWindow.Visible = false
 end)
 
--- 实时更新信息和光带流动效果
+-- 瀹炴椂鏇存柊淇℃伅鍜屽厜甯︽祦鍔ㄦ晥鏋?
 RunService.Heartbeat:Connect(function(deltaTime)
     frameCount = frameCount + 1
     local currentTime = tick()
     
-    -- 更新FPS
+    -- 鏇存柊FPS
     if currentTime - lastTime >= 1 then
         local fps = math.floor(frameCount / (currentTime - lastTime))
-        fpsLabel.Text = "帧率: " .. fps .. " FPS"
+        fpsLabel.Text = "甯х巼: " .. fps .. " FPS"
         minimizedFPS.Text = fps .. " FPS"
         frameCount = 0
         lastTime = currentTime
     end
     
-    -- 更新移动速度
+    -- 鏇存柊绉诲姩閫熷害
     if player.Character and player.Character:FindFirstChild("Humanoid") then
         local speed = player.Character.Humanoid.WalkSpeed
-        speedLabel.Text = "速度: " .. math.floor(speed)
+        speedLabel.Text = "閫熷害: " .. math.floor(speed)
     end
     
-    -- 更新当前时间
+    -- 鏇存柊褰撳墠鏃堕棿
     local realTime = os.date("*t")
     local timeString = string.format("%02d:%02d:%02d", realTime.hour, realTime.min, realTime.sec)
-    currentTimeLabel.Text = "时间: " .. timeString
+    currentTimeLabel.Text = "鏃堕棿: " .. timeString
     
-    -- 缩小时显示简化时间
+    -- 缂╁皬鏃舵樉绀虹畝鍖栨椂闂?
     local shortTime = string.format("%02d:%02d", realTime.hour, realTime.min)
     minimizedTime.Text = shortTime
     
-    -- 光带流动效果
+    -- 鍏夊甫娴佸姩鏁堟灉
     colorProgress = colorProgress + deltaTime * 2
     
     if colorProgress >= 1 then
@@ -1114,7 +1114,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
     lightBorder.Color = Color3.new(r, g, b)
 end)
 
--- 添加淡入动画
+-- 娣诲姞娣″叆鍔ㄧ敾
 mainFrame.Size = UDim2.new(0, 0, 0, 0)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 
@@ -1124,10 +1124,10 @@ local openTween = TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingS
 })
 openTween:Play()
 
-print("🎮 小拽脚本已加载完成! - 人物状态已重置")
+print("馃幃 灏忔嫿鑴氭湰宸插姞杞藉畬鎴? - 浜虹墿鐘舵€佸凡閲嶇疆")
 
 
--- ========== 吃吃世界功能 ==========
+-- ========== 鍚冨悆涓栫晫鍔熻兘 ==========
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local LocalPlayer = Players.LocalPlayer
@@ -1212,7 +1212,7 @@ local function createEatWorldWindow(title, width, height)
     closeBtn.Position = UDim2.new(1, -32, 0, 2.5)
     closeBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
     closeBtn.BorderSizePixel = 0
-    closeBtn.Text = "×"
+    closeBtn.Text = "脳"
     closeBtn.TextColor3 = Color3.new(1, 1, 1)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.GothamBold
@@ -1312,9 +1312,9 @@ local function createEatButton(parent, text, callback)
     return button
 end
 
-local autoWindow, autoContent = createEatWorldWindow("自动", 300, 400)
+local autoWindow, autoContent = createEatWorldWindow("鑷姩", 300, 400)
 
-createEatToggle(autoContent, "自动刷", function(enabled)
+createEatToggle(autoContent, "鑷姩鍒?, function(enabled)
     autofarm = enabled
     coroutine.wrap(function()
     	local text = Drawing.new("Text")
@@ -1373,7 +1373,7 @@ createEatToggle(autoContent, "自动刷", function(enabled)
                 local minuteEarn = secondEarn * 60
                 local hourEarn = minuteEarn * 60
                 local dayEarn = hourEarn * 24
-                text.Text = "\n运行时间: " .. string.format("%ih%im%is", hours, minutes % 60, seconds % 60) .. "\n实际时间: " .. string.format("%im%is", eatMinutes % 60, eatSeconds % 60) .. "\n大约时间: " .. string.format("%im%is", sellMinutes % 60, sellSeconds % 60) .. "\n每天: " .. dayEarn .. "\n块数: " .. numChunks
+                text.Text = "\n杩愯鏃堕棿: " .. string.format("%ih%im%is", hours, minutes % 60, seconds % 60) .. "\n瀹為檯鏃堕棿: " .. string.format("%im%is", eatMinutes % 60, eatSeconds % 60) .. "\n澶х害鏃堕棿: " .. string.format("%im%is", sellMinutes % 60, sellSeconds % 60) .. "\n姣忓ぉ: " .. dayEarn .. "\n鍧楁暟: " .. numChunks
                 hum:ChangeState(Enum.HumanoidStateType.Physics)
                 grab:FireServer()
                 root.Anchored = false
@@ -1445,7 +1445,7 @@ createEatToggle(autoContent, "自动刷", function(enabled)
     end)()
 end)
 
-createEatToggle(autoContent, "自动收", function(enabled)
+createEatToggle(autoContent, "鑷姩鏀?, function(enabled)
     autoCollectingCubes = enabled
     coroutine.wrap(function()
         LocalPlayer.PlayerScripts.CubeVis.Enabled = false
@@ -1464,7 +1464,7 @@ createEatToggle(autoContent, "自动收", function(enabled)
     end)()
 end)
 
-createEatToggle(autoContent, "自动领", function(enabled)
+createEatToggle(autoContent, "鑷姩棰?, function(enabled)
     autoClaimRewards = enabled
     coroutine.wrap(function()
         while autoClaimRewards do
@@ -1477,10 +1477,10 @@ createEatToggle(autoContent, "自动领", function(enabled)
     end)()
 end)
 
-createEatToggle(autoContent, "移动模式", function(enabled) farmMoving = enabled end)
-createEatToggle(autoContent, "显示地图", function(enabled) showMap = enabled end)
+createEatToggle(autoContent, "绉诲姩妯″紡", function(enabled) farmMoving = enabled end)
+createEatToggle(autoContent, "鏄剧ず鍦板浘", function(enabled) showMap = enabled end)
 
-createEatToggle(autoContent, "自动吃", function(enabled)
+createEatToggle(autoContent, "鑷姩鍚?, function(enabled)
     autoeat = enabled
     coroutine.wrap(function()
         while autoeat do
@@ -1494,9 +1494,9 @@ createEatToggle(autoContent, "自动吃", function(enabled)
     end)()
 end)
 
-local upgradeWindow, upgradeContent = createEatWorldWindow("升级", 300, 300)
+local upgradeWindow, upgradeContent = createEatWorldWindow("鍗囩骇", 300, 300)
 
-createEatToggle(upgradeContent, "大小", function(enabled)
+createEatToggle(upgradeContent, "澶у皬", function(enabled)
     autoUpgradeSize = enabled
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
@@ -1505,7 +1505,7 @@ createEatToggle(upgradeContent, "大小", function(enabled)
     end)()
 end)
 
-createEatToggle(upgradeContent, "移速", function(enabled)
+createEatToggle(upgradeContent, "绉婚€?, function(enabled)
     autoUpgradeSpd = enabled
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
@@ -1514,7 +1514,7 @@ createEatToggle(upgradeContent, "移速", function(enabled)
     end)()
 end)
 
-createEatToggle(upgradeContent, "乘数", function(enabled)
+createEatToggle(upgradeContent, "涔樻暟", function(enabled)
     autoUpgradeMulti = enabled
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
@@ -1523,7 +1523,7 @@ createEatToggle(upgradeContent, "乘数", function(enabled)
     end)()
 end)
 
-createEatToggle(upgradeContent, "吃速", function(enabled)
+createEatToggle(upgradeContent, "鍚冮€?, function(enabled)
     autoUpgradeEat = enabled
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
@@ -1532,9 +1532,9 @@ createEatToggle(upgradeContent, "吃速", function(enabled)
     end)()
 end)
 
-local figureWindow, figureContent = createEatWorldWindow("人物", 300, 250)
+local figureWindow, figureContent = createEatWorldWindow("浜虹墿", 300, 250)
 
-createEatToggle(figureContent, "取消锚固", function(enabled)
+createEatToggle(figureContent, "鍙栨秷閿氬浐", function(enabled)
     keepUnanchor = enabled
     coroutine.wrap(function()
         while keepUnanchor do
@@ -1546,7 +1546,7 @@ createEatToggle(figureContent, "取消锚固", function(enabled)
     end)()
 end)
 
-createEatToggle(figureContent, "边界保护", function(enabled)
+createEatToggle(figureContent, "杈圭晫淇濇姢", function(enabled)
     boundProtect = enabled
     coroutine.wrap(function()
         while boundProtect do
@@ -1562,33 +1562,33 @@ createEatToggle(figureContent, "边界保护", function(enabled)
     end)()
 end)
 
-local otherWindow, otherContent = createEatWorldWindow("其它", 300, 250)
+local otherWindow, otherContent = createEatWorldWindow("鍏跺畠", 300, 250)
 
-createEatButton(otherContent, "查看玩家数据", function()
-    local localization = {MaxSize = "体积", Speed = "移速", Multiplier = "乘数", EatSpeed = "吃速"}
+createEatButton(otherContent, "鏌ョ湅鐜╁鏁版嵁", function()
+    local localization = {MaxSize = "浣撶Н", Speed = "绉婚€?, Multiplier = "涔樻暟", EatSpeed = "鍚冮€?}
     local growthFunctions = {MaxSize = sizeGrowth, Speed = speedGrowth, Multiplier = multiplierGrowth, EatSpeed = eatSpeedGrowth}
     local priceFunctions = {MaxSize = sizePrice, Speed = speedPrice, Multiplier = multiplierPrice, EatSpeed = eatSpeedPrice}
     for _, player in Players:GetPlayers() do
         print()
         for _, upg in player.Upgrades:GetChildren() do
-            local content = player.Name .. "："
+            local content = player.Name .. "锛?
             local cost = 0
             for l = 2, upg.Value do cost += priceFunctions[upg.Name](l) end
-            content = content .. " " .. localization[upg.Name] .. "：" .. upg.Value .. "级；" .. growthFunctions[upg.Name](upg.Value) .. "值；" .. cost .. "花费；"
+            content = content .. " " .. localization[upg.Name] .. "锛? .. upg.Value .. "绾э紱" .. growthFunctions[upg.Name](upg.Value) .. "鍊硷紱" .. cost .. "鑺辫垂锛?
             print(content)
         end
     end
     game.StarterGui:SetCore("DevConsoleVisible", true)
 end)
 
-createEatToggle(otherContent, "竖屏", function(enabled)
+createEatToggle(otherContent, "绔栧睆", function(enabled)
     LocalPlayer.PlayerGui.ScreenOrientation = enabled and Enum.ScreenOrientation.Portrait or Enum.ScreenOrientation.LandscapeRight
 end)
 
 buttonFrame.Size = UDim2.new(1, 0, 0, 210)
 
 local eatWorldY = 95
-createSmallButton("自动", Color3.fromRGB(255, 165, 0), "🤖", UDim2.new(0, 5, 0, eatWorldY), function()
+createSmallButton("鑷姩", Color3.fromRGB(255, 165, 0), "馃", UDim2.new(0, 5, 0, eatWorldY), function()
     autoWindow.Visible = not autoWindow.Visible
     speedWindow.Visible = false
     colorWindow.Visible = false
@@ -1597,7 +1597,7 @@ createSmallButton("自动", Color3.fromRGB(255, 165, 0), "🤖", UDim2.new(0, 5,
     otherWindow.Visible = false
 end)
 
-createSmallButton("升级", Color3.fromRGB(34, 139, 34), "⬆️", UDim2.new(0, 170, 0, eatWorldY), function()
+createSmallButton("鍗囩骇", Color3.fromRGB(34, 139, 34), "猬嗭笍", UDim2.new(0, 170, 0, eatWorldY), function()
     upgradeWindow.Visible = not upgradeWindow.Visible
     speedWindow.Visible = false
     colorWindow.Visible = false
@@ -1606,7 +1606,7 @@ createSmallButton("升级", Color3.fromRGB(34, 139, 34), "⬆️", UDim2.new(0, 
     otherWindow.Visible = false
 end)
 
-createSmallButton("人物", Color3.fromRGB(138, 43, 226), "👤", UDim2.new(0, 5, 0, eatWorldY + 45), function()
+createSmallButton("浜虹墿", Color3.fromRGB(138, 43, 226), "馃懁", UDim2.new(0, 5, 0, eatWorldY + 45), function()
     figureWindow.Visible = not figureWindow.Visible
     speedWindow.Visible = false
     colorWindow.Visible = false
@@ -1615,7 +1615,7 @@ createSmallButton("人物", Color3.fromRGB(138, 43, 226), "👤", UDim2.new(0, 5
     otherWindow.Visible = false
 end)
 
-createSmallButton("其它", Color3.fromRGB(70, 130, 180), "📋", UDim2.new(0, 170, 0, eatWorldY + 45), function()
+createSmallButton("鍏跺畠", Color3.fromRGB(70, 130, 180), "馃搵", UDim2.new(0, 170, 0, eatWorldY + 45), function()
     otherWindow.Visible = not otherWindow.Visible
     speedWindow.Visible = false
     colorWindow.Visible = false
@@ -1624,16 +1624,15 @@ createSmallButton("其它", Color3.fromRGB(70, 130, 180), "📋", UDim2.new(0, 1
     figureWindow.Visible = false
 end)
 
-print("🎮 小拽脚本 + 吃吃世界功能已加载完成!")
+print("馃幃 灏忔嫿鑴氭湰 + 鍚冨悆涓栫晫鍔熻兘宸插姞杞藉畬鎴?")
 
 
--- 重置所有功能函数
-local function resetAllFeatures()
+-- 閲嶇疆鎵€鏈夊姛鑳藉嚱鏁?local function resetAllFeatures()
     if flying then
         flying = false
         if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
         if bodyAngularVelocity then bodyAngularVelocity:Destroy() bodyAngularVelocity = nil end
-        toggleFlyBtn.Text = "开启飞天"
+        toggleFlyBtn.Text = "寮€鍚澶?
         toggleFlyBtn.BackgroundColor3 = Color3.fromRGB(255, 193, 7)
         toggleFlyBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
         leftControlFrame.Visible = false
@@ -1661,11 +1660,11 @@ local function resetAllFeatures()
         if localChunkManager then localChunkManager.Enabled = true end
         if animate then animate.Enabled = true end
     end
-    print("✅ 所有功能已重置")
+    print("鉁?鎵€鏈夊姛鑳藉凡閲嶇疆")
 end
 
 buttonFrame.Size = UDim2.new(1, 0, 0, 255)
 
-createSmallButton("重置功能", Color3.fromRGB(220, 53, 69), "🔄", UDim2.new(0, 87.5, 0, eatWorldY + 90), function()
+createSmallButton("閲嶇疆鍔熻兘", Color3.fromRGB(220, 53, 69), "馃攧", UDim2.new(0, 87.5, 0, eatWorldY + 90), function()
     resetAllFeatures()
 end)
