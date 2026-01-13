@@ -1,4 +1,4 @@
--- ROBLOX 悬浮窗 UI
+﻿-- ROBLOX 悬浮窗 UI
 -- 现代化设计的游戏开发工具界面
 
 local Players = game:GetService("Players")
@@ -10,29 +10,82 @@ local HttpService = game:GetService("HttpService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- 配置保存
-local savedConfig = {
-    flySpeed = 50,
-    walkSpeed = 16
-}
-
-local function saveConfig()
-    pcall(function()
-        writefile("XiaoZhuaiScript_Config.json", HttpService:JSONEncode(savedConfig))
-        print("✅ 配置已保存")
-    end)
+-- 清理上次注入的所有内容
+for _, gui in pairs(playerGui:GetChildren()) do
+    if gui.Name == "FloatingUI" then
+        gui:Destroy()
+    end
 end
 
-local function loadConfig()
+-- 清理所有玩家头顶的BillboardGui
+for _, targetPlayer in pairs(Players:GetPlayers()) do
+    if targetPlayer.Character then
+        for _, obj in pairs(targetPlayer.Character:GetDescendants()) do
+            if obj:IsA("BillboardGui") and obj.Name == "HeadStatsGui" then
+                obj:Destroy()
+            end
+        end
+    end
+end
+
+-- 断开之前的连接
+if shared.XiaoZhuaiConnections then
+    for _, connection in pairs(shared.XiaoZhuaiConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+end
+shared.XiaoZhuaiConnections = {}
+
+-- 配置保存（shared表+文件双重保存）
+if not shared.XiaoZhuaiConfig then
+    shared.XiaoZhuaiConfig = {
+        flySpeed = 50,
+        walkSpeed = 16,
+        mainFrameColor = {150, 200, 255},
+        titleBarColor = {120, 160, 204},
+        infoFrameColor = {90, 120, 153},
+        borderColor = {150, 200, 255},
+        -- 吃吃世界功能状态
+        autofarm = false,
+        autoCollectingCubes = false,
+        autoClaimRewards = false,
+        farmMoving = false,
+        showMap = false,
+        autoeat = false,
+        autoUpgradeSize = false,
+        autoUpgradeSpd = false,
+        autoUpgradeMulti = false,
+        autoUpgradeEat = false,
+        keepUnanchor = false,
+        boundProtect = false
+    }
+    -- 尝试从文件加载
     pcall(function()
-        if isfile("XiaoZhuaiScript_Config.json") then
-            savedConfig = HttpService:JSONDecode(readfile("XiaoZhuaiScript_Config.json"))
-            print("✅ 配置已加载")
+        if isfile and readfile and isfile("XiaoZhuai.txt") then
+            local data = readfile("XiaoZhuai.txt")
+            local loaded = HttpService:JSONDecode(data)
+            for k, v in pairs(loaded) do
+                shared.XiaoZhuaiConfig[k] = v
+            end
+            print("✅ 从文件加载配置成功")
         end
     end)
 end
 
-loadConfig()
+local savedConfig = shared.XiaoZhuaiConfig
+
+print("✅ 配置已加载 - 飞行速度:" .. savedConfig.flySpeed .. " 人物速度:" .. savedConfig.walkSpeed)
+
+local function saveConfig()
+    shared.XiaoZhuaiConfig = savedConfig
+    -- 尝试保存到文件
+    pcall(function()
+        if writefile then
+            writefile("XiaoZhuai.txt", HttpService:JSONEncode(savedConfig))
+        end
+    end)
+    print("✅ 配置已保存 - 飞行:" .. savedConfig.flySpeed .. " 人物:" .. savedConfig.walkSpeed)
+end
 
 -- 重置人物状态函数
 local function resetPlayerState()
@@ -73,14 +126,48 @@ local function resetPlayerState()
 end
 
 -- 删除之前的悬浮窗实例并重置状态
-for _, gui in pairs(playerGui:GetChildren()) do
-    if gui.Name == "FloatingUI" then
-        gui:Destroy()
+-- (已在开头清理)
+
+-- 重置人物状态（但不重置速度）
+if player.Character then
+    local character = player.Character
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    if humanoid then
+        humanoid.JumpPower = 50
+        humanoid.PlatformStand = false
+    end
+    
+    if rootPart then
+        for _, obj in pairs(rootPart:GetChildren()) do
+            if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                obj:Destroy()
+            end
+        end
+    end
+    
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            for _, obj in pairs(part:GetChildren()) do
+                if obj:IsA("BodyVelocity") or obj:IsA("BodyAngularVelocity") or obj:IsA("BodyPosition") or obj:IsA("BodyForce") then
+                    obj:Destroy()
+                end
+            end
+        end
     end
 end
 
--- 重置人物状态
-resetPlayerState()
+-- 应用保存的配置
+if player.Character and player.Character:FindFirstChild("Humanoid") then
+    player.Character.Humanoid.WalkSpeed = savedConfig.walkSpeed
+    print("✅ 已应用保存的速度: " .. savedConfig.walkSpeed)
+end
+
+player.CharacterAdded:Connect(function(character)
+    character:WaitForChild("Humanoid").WalkSpeed = savedConfig.walkSpeed
+    print("✅ 角色重生，已应用保存的速度: " .. savedConfig.walkSpeed)
+end)
 
 -- 创建主界面
 local screenGui = Instance.new("ScreenGui")
@@ -88,6 +175,36 @@ screenGui.Name = "FloatingUI"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 screenGui.Parent = playerGui
+
+-- 右上角永久帧率显示器
+local permanentFpsFrame = Instance.new("Frame")
+permanentFpsFrame.Name = "PermanentFPS"
+permanentFpsFrame.Size = UDim2.new(0, 100, 0, 35)
+-- 自动适配设备：电脑显示在右上角最顶部，手机显示在右上角
+local screenSize = workspace.CurrentCamera.ViewportSize
+local isMobile = screenSize.X < screenSize.Y or UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+if isMobile then
+    permanentFpsFrame.Position = UDim2.new(1, -110, 0, 5)
+else
+    permanentFpsFrame.Position = UDim2.new(1, -360, 0, -35)  -- 电脑端往右移50像素（半个宽度）
+end
+permanentFpsFrame.BackgroundTransparency = 1  -- 完全透明，去掉背景
+permanentFpsFrame.BorderSizePixel = 0
+permanentFpsFrame.Parent = screenGui
+
+local permanentFpsLabel = Instance.new("TextLabel")
+permanentFpsLabel.Size = UDim2.new(1, 0, 1, 0)
+permanentFpsLabel.BackgroundTransparency = 1
+permanentFpsLabel.Text = "60 FPS"
+permanentFpsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+permanentFpsLabel.TextSize = 18
+permanentFpsLabel.Font = Enum.Font.GothamBold
+permanentFpsLabel.TextStrokeTransparency = 0  -- 添加文字描边
+permanentFpsLabel.TextStrokeColor3 = Color3.fromRGB(255, 100, 100)  -- 彩色描边，会动态变化
+permanentFpsLabel.Parent = permanentFpsFrame
+
+-- 保存描边引用以便后续更新颜色
+local permanentFpsStroke = permanentFpsLabel
 
 -- 窗口层级管理
 local currentZIndex = 1
@@ -161,10 +278,10 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 350, 0, 450)
 mainFrame.Position = UDim2.new(0.5, -175, 0.5, -225)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.mainFrameColor[1], savedConfig.mainFrameColor[2], savedConfig.mainFrameColor[3])
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
-mainFrame.Draggable = false
+mainFrame.Draggable = true
 mainFrame.Parent = screenGui
 
 -- 主窗口点击置顶
@@ -181,7 +298,7 @@ corner.Parent = mainFrame
 
 -- 流动光带边框
 local lightBorder = Instance.new("UIStroke")
-lightBorder.Color = Color3.fromRGB(255, 0, 0)
+lightBorder.Color = Color3.fromRGB(savedConfig.borderColor[1], savedConfig.borderColor[2], savedConfig.borderColor[3])
 lightBorder.Thickness = 3
 lightBorder.Parent = mainFrame
 
@@ -193,42 +310,13 @@ local titleBar = Instance.new("Frame")
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.Position = UDim2.new(0, 0, 0, 0)
-titleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+titleBar.BackgroundColor3 = Color3.fromRGB(savedConfig.titleBarColor[1], savedConfig.titleBarColor[2], savedConfig.titleBarColor[3])
 titleBar.BorderSizePixel = 0
 titleBar.Parent = mainFrame
 
 local titleCorner = Instance.new("UICorner")
 titleCorner.CornerRadius = UDim.new(0, 12)
 titleCorner.Parent = titleBar
-
--- 标题栏拖动
-local mainDragging = false
-local mainDragStart = nil
-local mainStartPos = nil
-titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        mainDragging = true
-        mainDragStart = input.Position
-        mainStartPos = mainFrame.Position
-        bringToFront(mainFrame)
-    end
-end)
-titleBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        mainDragging = false
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if mainDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - mainDragStart
-        mainFrame.Position = UDim2.new(mainStartPos.X.Scale, mainStartPos.X.Offset + delta.X, mainStartPos.Y.Scale, mainStartPos.Y.Offset + delta.Y)
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        mainDragging = false
-    end
-end)
 
 -- 缩小时的当前时间显示（左边）
 local minimizedTime = Instance.new("TextLabel")
@@ -313,7 +401,7 @@ local infoFrame = Instance.new("Frame")
 infoFrame.Name = "InfoFrame"
 infoFrame.Size = UDim2.new(1, 0, 0, 150)
 infoFrame.Position = UDim2.new(0, 0, 0, 0)
-infoFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+infoFrame.BackgroundColor3 = Color3.fromRGB(savedConfig.infoFrameColor[1], savedConfig.infoFrameColor[2], savedConfig.infoFrameColor[3])
 infoFrame.BorderSizePixel = 0
 infoFrame.Parent = contentFrame
 
@@ -494,6 +582,7 @@ flySpeedSetBtn.MouseButton1Click:Connect(function()
         flySpeedLabel.Text = "飞行速度: " .. flySpeed
         savedConfig.flySpeed = flySpeed
         saveConfig()
+        print("✅ 飞行速度已设置为: " .. flySpeed)
     else
         flySpeedInput.Text = tostring(flySpeed)
     end
@@ -736,49 +825,13 @@ local speedCloseBtnCorner = Instance.new("UICorner")
 speedCloseBtnCorner.CornerRadius = UDim.new(0, 3)
 speedCloseBtnCorner.Parent = speedCloseBtn
 
--- 滚动框
-local speedScrollFrame = Instance.new("ScrollingFrame")
-speedScrollFrame.Size = UDim2.new(1, -20, 1, -80)
-speedScrollFrame.Position = UDim2.new(0, 10, 0, 40)
-speedScrollFrame.BackgroundTransparency = 1
-speedScrollFrame.ScrollBarThickness = 8
-speedScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 1200)
-speedScrollFrame.Parent = speedWindow
-
--- 预设速度
-local speedValues = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 2000, 3000, 4000}
-
-for i, speed in ipairs(speedValues) do
-    local speedBtn = Instance.new("TextButton")
-    speedBtn.Size = UDim2.new(0, 180, 0, 35)
-    speedBtn.Position = UDim2.new(0, 10 + ((i-1) % 2) * 190, 0, 10 + math.floor((i-1) / 2) * 45)
-    speedBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
-    speedBtn.Text = "速度: " .. speed
-    speedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    speedBtn.TextSize = 12
-    speedBtn.Font = Enum.Font.Gotham
-    speedBtn.BorderSizePixel = 0
-    speedBtn.Parent = speedScrollFrame
-    
-    local speedBtnCorner = Instance.new("UICorner")
-    speedBtnCorner.CornerRadius = UDim.new(0, 5)
-    speedBtnCorner.Parent = speedBtn
-    
-    speedBtn.MouseButton1Click:Connect(function()
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = speed
-            print("移动速度已设置为: " .. speed)
-        end
-    end)
-end
-
--- 自定义移速区域
+-- 自定义移速区域（移到顶部）
 local customSpeedFrame = Instance.new("Frame")
 customSpeedFrame.Size = UDim2.new(1, -20, 0, 80)
-customSpeedFrame.Position = UDim2.new(0, 10, 0, 470)
+customSpeedFrame.Position = UDim2.new(0, 10, 0, 40)
 customSpeedFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
 customSpeedFrame.BorderSizePixel = 0
-customSpeedFrame.Parent = speedScrollFrame
+customSpeedFrame.Parent = speedWindow
 
 local customSpeedCorner = Instance.new("UICorner")
 customSpeedCorner.CornerRadius = UDim.new(0, 8)
@@ -829,12 +882,52 @@ customSpeedSetBtn.MouseButton1Click:Connect(function()
     if speedValue and speedValue > 0 then
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid.WalkSpeed = speedValue
+            savedConfig.walkSpeed = speedValue
+            saveConfig()
             print("自定义移动速度已设置为: " .. speedValue)
         end
     else
         print("请输入有效的数字")
     end
 end)
+
+-- 滚动框
+local speedScrollFrame = Instance.new("ScrollingFrame")
+speedScrollFrame.Size = UDim2.new(1, -20, 1, -130)
+speedScrollFrame.Position = UDim2.new(0, 10, 0, 130)
+speedScrollFrame.BackgroundTransparency = 1
+speedScrollFrame.ScrollBarThickness = 8
+speedScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 460)
+speedScrollFrame.Parent = speedWindow
+
+-- 预设速度
+local speedValues = {100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 2000, 3000, 4000}
+
+for i, speed in ipairs(speedValues) do
+    local speedBtn = Instance.new("TextButton")
+    speedBtn.Size = UDim2.new(0, 180, 0, 35)
+    speedBtn.Position = UDim2.new(0, 10 + ((i-1) % 2) * 190, 0, 10 + math.floor((i-1) / 2) * 45)
+    speedBtn.BackgroundColor3 = Color3.fromRGB(220, 53, 69)
+    speedBtn.Text = "速度: " .. speed
+    speedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    speedBtn.TextSize = 12
+    speedBtn.Font = Enum.Font.Gotham
+    speedBtn.BorderSizePixel = 0
+    speedBtn.Parent = speedScrollFrame
+    
+    local speedBtnCorner = Instance.new("UICorner")
+    speedBtnCorner.CornerRadius = UDim.new(0, 5)
+    speedBtnCorner.Parent = speedBtn
+    
+    speedBtn.MouseButton1Click:Connect(function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = speed
+            savedConfig.walkSpeed = speed
+            saveConfig()
+            print("移动速度已设置为: " .. speed)
+        end
+    end)
+end
 
 -- 颜色选择窗口（可拖动，可缩放）
 local colorWindow = Instance.new("Frame")
@@ -927,6 +1020,11 @@ for i, colorData in ipairs(colors) do
         titleBar.BackgroundColor3 = Color3.new(colorData[1].R * 0.8, colorData[1].G * 0.8, colorData[1].B * 0.8)
         infoFrame.BackgroundColor3 = Color3.new(colorData[1].R * 0.6, colorData[1].G * 0.6, colorData[1].B * 0.6)
         lightBorder.Color = colorData[1]
+        savedConfig.mainFrameColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
+        savedConfig.titleBarColor = {math.floor(colorData[1].R * 0.8 * 255), math.floor(colorData[1].G * 0.8 * 255), math.floor(colorData[1].B * 0.8 * 255)}
+        savedConfig.infoFrameColor = {math.floor(colorData[1].R * 0.6 * 255), math.floor(colorData[1].G * 0.6 * 255), math.floor(colorData[1].B * 0.6 * 255)}
+        savedConfig.borderColor = {math.floor(colorData[1].R * 255), math.floor(colorData[1].G * 255), math.floor(colorData[1].B * 255)}
+        saveConfig()
         print("颜色已更改为: " .. colorData[2])
     end)
 end
@@ -975,9 +1073,294 @@ createSmallButton("移速设置", Color3.fromRGB(220, 53, 69), "⚡", UDim2.new(
     colorWindow.Visible = false
 end)
 
-createSmallButton("自定义颜色", Color3.fromRGB(138, 43, 226), "🎨", UDim2.new(0, 87.5, 0, 50), function()
+createSmallButton("自定义颜色", Color3.fromRGB(138, 43, 226), "🎨", UDim2.new(0, 5, 0, 50), function()
     colorWindow.Visible = not colorWindow.Visible
     speedWindow.Visible = false
+end)
+
+local showHeadStats = savedConfig.showHeadStats or false
+local playerStatsGuis = {}
+local playerStatsConnections = {}
+
+local function sizeGrowth(level) return math.floor(((level + 0.5) ^ 2 - 0.25) / 2 * 100) end
+
+local function updateHeadStats()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and p.Character:FindFirstChild("Head") then
+            local existingGui = p.Character.Head:FindFirstChild("HeadStatsGui")
+            if existingGui then
+                local statsLabel = existingGui:FindFirstChildOfClass("TextLabel")
+                if statsLabel then
+                    statsLabel.TextColor3 = savedConfig.headTextColor and Color3.fromRGB(savedConfig.headTextColor[1], savedConfig.headTextColor[2], savedConfig.headTextColor[3]) or Color3.fromRGB(255, 255, 255)
+                    statsLabel.TextSize = savedConfig.headTextSize or 12
+                end
+            end
+        end
+    end
+end
+
+local function createHeadStatsForPlayer(targetPlayer)
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Head") then return end
+    if playerStatsGuis[targetPlayer.UserId] then playerStatsGuis[targetPlayer.UserId]:Destroy() end
+    if playerStatsConnections[targetPlayer.UserId] then playerStatsConnections[targetPlayer.UserId]:Disconnect() end
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "HeadStatsGui"
+    gui.Adornee = targetPlayer.Character.Head
+    gui.Size = UDim2.new(0, 150, 0, 70)
+    gui.StudsOffset = Vector3.new(0, 2.5, 0)
+    gui.AlwaysOnTop = true
+    gui.Parent = targetPlayer.Character.Head
+    local statsLabel = Instance.new("TextLabel")
+    statsLabel.Size = UDim2.new(1, 0, 1, 0)
+    statsLabel.BackgroundTransparency = 1
+    statsLabel.TextColor3 = savedConfig.headTextColor and Color3.fromRGB(savedConfig.headTextColor[1], savedConfig.headTextColor[2], savedConfig.headTextColor[3]) or Color3.fromRGB(255, 255, 255)
+    statsLabel.TextSize = savedConfig.headTextSize or 12
+    statsLabel.Font = Enum.Font.GothamBold
+    statsLabel.RichText = true
+    statsLabel.TextStrokeTransparency = 0
+    statsLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    statsLabel.TextYAlignment = Enum.TextYAlignment.Top
+    statsLabel.Parent = gui
+    playerStatsGuis[targetPlayer.UserId] = gui
+    local connection = RunService.Heartbeat:Connect(function()
+        if not showHeadStats or not targetPlayer.Character or not gui.Parent then
+            if playerStatsGuis[targetPlayer.UserId] then playerStatsGuis[targetPlayer.UserId]:Destroy() playerStatsGuis[targetPlayer.UserId] = nil end
+            if playerStatsConnections[targetPlayer.UserId] then playerStatsConnections[targetPlayer.UserId]:Disconnect() playerStatsConnections[targetPlayer.UserId] = nil end
+            return
+        end
+        local humanoid = targetPlayer.Character:FindFirstChild("Humanoid")
+        if humanoid and targetPlayer:FindFirstChild("Upgrades") then
+            local maxSize = targetPlayer.Upgrades:FindFirstChild("MaxSize")
+            local multiplier = targetPlayer.Upgrades:FindFirstChild("Multiplier")
+            local speed = humanoid.WalkSpeed
+            local maxSizeLevel = maxSize and maxSize.Value or 0
+            local maxSizeValue = sizeGrowth(maxSizeLevel)
+            local multiplierValue = multiplier and multiplier.Value or 0
+            local colorHex = maxSizeValue >= 10000000 and "#FF0000" or (maxSizeValue >= 100000 and "#FFFF00" or "#00FF00")
+            statsLabel.Text = string.format("速度: %d\n乘数: %dx\n最大体积: <font color='%s'>%d</font>", math.floor(speed), multiplierValue, colorHex, maxSizeValue)
+        end
+    end)
+    playerStatsConnections[targetPlayer.UserId] = connection
+end
+
+local function createAllPlayersStats()
+    for _, targetPlayer in pairs(Players:GetPlayers()) do
+        if targetPlayer.Character then createHeadStatsForPlayer(targetPlayer) end
+    end
+end
+
+local function removeAllPlayersStats()
+    for userId, gui in pairs(playerStatsGuis) do gui:Destroy() playerStatsGuis[userId] = nil end
+    for userId, connection in pairs(playerStatsConnections) do connection:Disconnect() playerStatsConnections[userId] = nil end
+end
+
+function toggleHeadStats(enabled)
+    showHeadStats = enabled
+    savedConfig.showHeadStats = enabled
+    saveConfig()
+    if enabled then createAllPlayersStats() else removeAllPlayersStats() end
+end
+
+if showHeadStats then
+    createAllPlayersStats()
+end
+
+Players.PlayerAdded:Connect(function(newPlayer)
+    newPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if showHeadStats then createHeadStatsForPlayer(newPlayer) end
+    end)
+end)
+
+for _, existingPlayer in pairs(Players:GetPlayers()) do
+    existingPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if showHeadStats then createHeadStatsForPlayer(existingPlayer) end
+    end)
+end
+
+createSmallButton("自定义名称", Color3.fromRGB(255, 165, 0), "📝", UDim2.new(0, 170, 0, 50), function()
+    if not screenGui:FindFirstChild("NameWindow") then
+        local nameWindow = Instance.new("Frame")
+        nameWindow.Name = "NameWindow"
+        nameWindow.Size = UDim2.new(0, 320, 0, 280)
+        nameWindow.Position = UDim2.new(0, 370, 0, 20)
+        nameWindow.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        nameWindow.BorderSizePixel = 0
+        nameWindow.Visible = true
+        nameWindow.Active = true
+        nameWindow.Draggable = true
+        nameWindow.Parent = screenGui
+        nameWindow.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then bringToFront(nameWindow) end
+        end)
+        local nameWindowCorner = Instance.new("UICorner")
+        nameWindowCorner.CornerRadius = UDim.new(0, 10)
+        nameWindowCorner.Parent = nameWindow
+        local nameWindowBorder = Instance.new("UIStroke")
+        nameWindowBorder.Color = Color3.fromRGB(255, 165, 0)
+        nameWindowBorder.Thickness = 2
+        nameWindowBorder.Parent = nameWindow
+        createResizeHandle(nameWindow)
+        local nameTitle = Instance.new("TextLabel")
+        nameTitle.Size = UDim2.new(1, -25, 0, 30)
+        nameTitle.Position = UDim2.new(0, 5, 0, 5)
+        nameTitle.BackgroundTransparency = 1
+        nameTitle.Text = "📝 自定义名称"
+        nameTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameTitle.TextSize = 14
+        nameTitle.Font = Enum.Font.GothamBold
+        nameTitle.Parent = nameWindow
+        local nameCloseBtn = Instance.new("TextButton")
+        nameCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+        nameCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+        nameCloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        nameCloseBtn.Text = "×"
+        nameCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameCloseBtn.TextSize = 12
+        nameCloseBtn.BorderSizePixel = 0
+        nameCloseBtn.Parent = nameWindow
+        local nameCloseBtnCorner = Instance.new("UICorner")
+        nameCloseBtnCorner.CornerRadius = UDim.new(0, 3)
+        nameCloseBtnCorner.Parent = nameCloseBtn
+        nameCloseBtn.MouseButton1Click:Connect(function() nameWindow:Destroy() end)
+        local sizeLabel = Instance.new("TextLabel")
+        sizeLabel.Size = UDim2.new(1, -20, 0, 25)
+        sizeLabel.Position = UDim2.new(0, 10, 0, 45)
+        sizeLabel.BackgroundTransparency = 1
+        sizeLabel.Text = "文字大小: " .. (savedConfig.headTextSize or 12)
+        sizeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sizeLabel.TextSize = 14
+        sizeLabel.Font = Enum.Font.GothamBold
+        sizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        sizeLabel.Parent = nameWindow
+        local sizeSlider = Instance.new("Frame")
+        sizeSlider.Size = UDim2.new(1, -20, 0, 30)
+        sizeSlider.Position = UDim2.new(0, 10, 0, 75)
+        sizeSlider.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
+        sizeSlider.BorderSizePixel = 0
+        sizeSlider.Parent = nameWindow
+        local sizeSliderCorner = Instance.new("UICorner")
+        sizeSliderCorner.CornerRadius = UDim.new(0, 5)
+        sizeSliderCorner.Parent = sizeSlider
+        for i, size in ipairs({8, 10, 12, 14, 16, 18}) do
+            local sizeBtn = Instance.new("TextButton")
+            sizeBtn.Size = UDim2.new(0, 45, 0, 25)
+            sizeBtn.Position = UDim2.new(0, 5 + (i-1) * 48, 0, 2.5)
+            sizeBtn.BackgroundColor3 = size == (savedConfig.headTextSize or 12) and Color3.fromRGB(40, 167, 69) or Color3.fromRGB(60, 60, 80)
+            sizeBtn.Text = tostring(size)
+            sizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            sizeBtn.TextSize = 12
+            sizeBtn.Font = Enum.Font.Gotham
+            sizeBtn.BorderSizePixel = 0
+            sizeBtn.Parent = sizeSlider
+            local sizeBtnCorner = Instance.new("UICorner")
+            sizeBtnCorner.CornerRadius = UDim.new(0, 4)
+            sizeBtnCorner.Parent = sizeBtn
+            sizeBtn.MouseButton1Click:Connect(function()
+                savedConfig.headTextSize = size
+                saveConfig()
+                updateHeadStats()
+                sizeLabel.Text = "文字大小: " .. size
+                for _, btn in pairs(sizeSlider:GetChildren()) do
+                    if btn:IsA("TextButton") then btn.BackgroundColor3 = Color3.fromRGB(60, 60, 80) end
+                end
+                sizeBtn.BackgroundColor3 = Color3.fromRGB(40, 167, 69)
+            end)
+        end
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Size = UDim2.new(1, -20, 0, 40)
+        toggleFrame.Position = UDim2.new(0, 10, 0, 115)
+        toggleFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Parent = nameWindow
+        local toggleCorner = Instance.new("UICorner")
+        toggleCorner.CornerRadius = UDim.new(0, 6)
+        toggleCorner.Parent = toggleFrame
+        local toggleLabel = Instance.new("TextLabel")
+        toggleLabel.Size = UDim2.new(1, -55, 1, 0)
+        toggleLabel.Position = UDim2.new(0, 10, 0, 0)
+        toggleLabel.BackgroundTransparency = 1
+        toggleLabel.Text = "头顶显示"
+        toggleLabel.TextColor3 = Color3.new(1, 1, 1)
+        toggleLabel.TextSize = 14
+        toggleLabel.Font = Enum.Font.Gotham
+        toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        toggleLabel.Parent = toggleFrame
+        local toggle = Instance.new("TextButton")
+        toggle.Size = UDim2.new(0, 45, 0, 25)
+        toggle.Position = UDim2.new(1, -50, 0.5, -12.5)
+        toggle.BackgroundColor3 = showHeadStats and Color3.fromRGB(50, 200, 50) or Color3.fromRGB(200, 50, 50)
+        toggle.BorderSizePixel = 0
+        toggle.Text = ""
+        toggle.Parent = toggleFrame
+        local toggleCorner2 = Instance.new("UICorner")
+        toggleCorner2.CornerRadius = UDim.new(1, 0)
+        toggleCorner2.Parent = toggle
+        local indicator = Instance.new("Frame")
+        indicator.Size = UDim2.new(0, 19, 0, 19)
+        indicator.Position = showHeadStats and UDim2.new(1, -22, 0.5, -9.5) or UDim2.new(0, 3, 0.5, -9.5)
+        indicator.BackgroundColor3 = Color3.new(1, 1, 1)
+        indicator.BorderSizePixel = 0
+        indicator.Parent = toggle
+        local indicatorCorner = Instance.new("UICorner")
+        indicatorCorner.CornerRadius = UDim.new(1, 0)
+        indicatorCorner.Parent = indicator
+        toggle.MouseButton1Click:Connect(function()
+            showHeadStats = not showHeadStats
+            if showHeadStats then
+                toggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+                indicator.Position = UDim2.new(1, -22, 0.5, -9.5)
+            else
+                toggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                indicator.Position = UDim2.new(0, 3, 0.5, -9.5)
+            end
+            toggleHeadStats(showHeadStats)
+        end)
+        local colorLabel = Instance.new("TextLabel")
+        colorLabel.Size = UDim2.new(1, -20, 0, 25)
+        colorLabel.Position = UDim2.new(0, 10, 0, 165)
+        colorLabel.BackgroundTransparency = 1
+        colorLabel.Text = "文字颜色"
+        colorLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        colorLabel.TextSize = 14
+        colorLabel.Font = Enum.Font.GothamBold
+        colorLabel.TextXAlignment = Enum.TextXAlignment.Left
+        colorLabel.Parent = nameWindow
+        local colorFrame = Instance.new("Frame")
+        colorFrame.Size = UDim2.new(1, -20, 0, 80)
+        colorFrame.Position = UDim2.new(0, 10, 0, 195)
+        colorFrame.BackgroundTransparency = 1
+        colorFrame.Parent = nameWindow
+        local headColors = {{255,255,255,"白色"},{255,100,100,"红色"},{100,255,100,"绿色"},{100,200,255,"蓝色"},{255,255,100,"黄色"},{255,150,255,"紫色"}}
+        for i, c in ipairs(headColors) do
+            local colorBtn = Instance.new("TextButton")
+            colorBtn.Size = UDim2.new(0, 95, 0, 35)
+            colorBtn.Position = UDim2.new(0, ((i-1) % 3) * 100, 0, math.floor((i-1) / 3) * 40)
+            colorBtn.BackgroundColor3 = Color3.fromRGB(c[1], c[2], c[3])
+            colorBtn.Text = c[4]
+            colorBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+            colorBtn.TextSize = 12
+            colorBtn.Font = Enum.Font.Gotham
+            colorBtn.BorderSizePixel = 0
+            colorBtn.Parent = colorFrame
+            local colorBtnCorner = Instance.new("UICorner")
+            colorBtnCorner.CornerRadius = UDim.new(0, 5)
+            colorBtnCorner.Parent = colorBtn
+            colorBtn.MouseButton1Click:Connect(function()
+                savedConfig.headTextColor = {c[1], c[2], c[3]}
+                saveConfig()
+                updateHeadStats()
+            end)
+        end
+        Players.PlayerRemoving:Connect(function(removingPlayer)
+            if playerStatsGuis[removingPlayer.UserId] then playerStatsGuis[removingPlayer.UserId]:Destroy() playerStatsGuis[removingPlayer.UserId] = nil end
+            if playerStatsConnections[removingPlayer.UserId] then playerStatsConnections[removingPlayer.UserId]:Disconnect() playerStatsConnections[removingPlayer.UserId] = nil end
+        end)
+    else
+        local existing = screenGui:FindFirstChild("NameWindow")
+        existing.Visible = not existing.Visible
+    end
 end)
 
 -- 功能实现
@@ -1048,6 +1431,15 @@ RunService.Heartbeat:Connect(function(deltaTime)
         local fps = math.floor(frameCount / (currentTime - lastTime))
         fpsLabel.Text = "帧率: " .. fps .. " FPS"
         minimizedFPS.Text = fps .. " FPS"
+        permanentFpsLabel.Text = fps .. " FPS"  -- 更新永久帧率显示
+        -- 根据FPS值改变颜色
+        if fps >= 50 then
+            permanentFpsLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        elseif fps >= 30 then
+            permanentFpsLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+        else
+            permanentFpsLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
         frameCount = 0
         lastTime = currentTime
     end
@@ -1090,6 +1482,8 @@ RunService.Heartbeat:Connect(function(deltaTime)
     local b = currentColor.B + (nextColor.B - currentColor.B) * colorProgress
     
     lightBorder.Color = Color3.new(r, g, b)
+    -- 更新FPS描边为彩色光带
+    permanentFpsLabel.TextStrokeColor3 = Color3.new(r, g, b)
 end)
 
 -- 添加淡入动画
@@ -1110,18 +1504,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Events = ReplicatedStorage:WaitForChild("Events")
 local LocalPlayer = Players.LocalPlayer
 
-local autofarm = false
-local autoCollectingCubes = false
-local autoClaimRewards = false
-local farmMoving = false
-local showMap = false
-local autoeat = false
-local autoUpgradeSize = false
-local autoUpgradeSpd = false
-local autoUpgradeMulti = false
-local autoUpgradeEat = false
-local keepUnanchor = false
-local boundProtect = false
+local autofarm = savedConfig.autofarm or false
+local autoCollectingCubes = savedConfig.autoCollectingCubes or false
+local autoClaimRewards = savedConfig.autoClaimRewards or false
+local farmMoving = savedConfig.farmMoving or false
+local showMap = savedConfig.showMap or false
+local autoeat = savedConfig.autoeat or false
+local autoUpgradeSize = savedConfig.autoUpgradeSize or false
+local autoUpgradeSpd = savedConfig.autoUpgradeSpd or false
+local autoUpgradeMulti = savedConfig.autoUpgradeMulti or false
+local autoUpgradeEat = savedConfig.autoUpgradeEat or false
+local keepUnanchor = savedConfig.keepUnanchor ~= nil and savedConfig.keepUnanchor or false
+local boundProtect = savedConfig.boundProtect ~= nil and savedConfig.boundProtect or false
 
 local function getRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -1294,6 +1688,8 @@ local autoWindow, autoContent = createEatWorldWindow("自动", 300, 400)
 
 createEatToggle(autoContent, "自动刷", function(enabled)
     autofarm = enabled
+    savedConfig.autofarm = enabled
+    saveConfig()
     coroutine.wrap(function()
     	local text = Drawing.new("Text")
     	text.Outline = true
@@ -1425,6 +1821,8 @@ end)
 
 createEatToggle(autoContent, "自动收", function(enabled)
     autoCollectingCubes = enabled
+    savedConfig.autoCollectingCubes = enabled
+    saveConfig()
     coroutine.wrap(function()
         LocalPlayer.PlayerScripts.CubeVis.Enabled = false
         while autoCollectingCubes do
@@ -1444,6 +1842,8 @@ end)
 
 createEatToggle(autoContent, "自动领", function(enabled)
     autoClaimRewards = enabled
+    savedConfig.autoClaimRewards = enabled
+    saveConfig()
     coroutine.wrap(function()
         while autoClaimRewards do
             task.wait(1)
@@ -1455,11 +1855,13 @@ createEatToggle(autoContent, "自动领", function(enabled)
     end)()
 end)
 
-createEatToggle(autoContent, "移动模式", function(enabled) farmMoving = enabled end)
-createEatToggle(autoContent, "显示地图", function(enabled) showMap = enabled end)
+createEatToggle(autoContent, "移动模式", function(enabled) farmMoving = enabled savedConfig.farmMoving = enabled saveConfig() end)
+createEatToggle(autoContent, "显示地图", function(enabled) showMap = enabled savedConfig.showMap = enabled saveConfig() end)
 
 createEatToggle(autoContent, "自动吃", function(enabled)
     autoeat = enabled
+    savedConfig.autoeat = enabled
+    saveConfig()
     coroutine.wrap(function()
         while autoeat do
             local dt = task.wait()
@@ -1476,6 +1878,8 @@ local upgradeWindow, upgradeContent = createEatWorldWindow("升级", 300, 300)
 
 createEatToggle(upgradeContent, "大小", function(enabled)
     autoUpgradeSize = enabled
+    savedConfig.autoUpgradeSize = enabled
+    saveConfig()
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
         while autoUpgradeSize do task.wait(1) Events.PurchaseEvent:FireServer("MaxSize") end
@@ -1485,6 +1889,8 @@ end)
 
 createEatToggle(upgradeContent, "移速", function(enabled)
     autoUpgradeSpd = enabled
+    savedConfig.autoUpgradeSpd = enabled
+    saveConfig()
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
         while autoUpgradeSpd do task.wait(1) Events.PurchaseEvent:FireServer("Speed") end
@@ -1494,6 +1900,8 @@ end)
 
 createEatToggle(upgradeContent, "乘数", function(enabled)
     autoUpgradeMulti = enabled
+    savedConfig.autoUpgradeMulti = enabled
+    saveConfig()
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
         while autoUpgradeMulti do task.wait(1) Events.PurchaseEvent:FireServer("Multiplier") end
@@ -1503,6 +1911,8 @@ end)
 
 createEatToggle(upgradeContent, "吃速", function(enabled)
     autoUpgradeEat = enabled
+    savedConfig.autoUpgradeEat = enabled
+    saveConfig()
     coroutine.wrap(function()
         game.CoreGui.PurchasePromptApp.Enabled = false
         while autoUpgradeEat do task.wait(1) Events.PurchaseEvent:FireServer("EatSpeed") end
@@ -1514,6 +1924,8 @@ local figureWindow, figureContent = createEatWorldWindow("人物", 300, 250)
 
 createEatToggle(figureContent, "取消锚固", function(enabled)
     keepUnanchor = enabled
+    savedConfig.keepUnanchor = enabled
+    saveConfig()
     coroutine.wrap(function()
         while keepUnanchor do
             task.wait()
@@ -1526,6 +1938,8 @@ end)
 
 createEatToggle(figureContent, "边界保护", function(enabled)
     boundProtect = enabled
+    savedConfig.boundProtect = enabled
+    saveConfig()
     coroutine.wrap(function()
         while boundProtect do
             task.wait()
@@ -1647,3 +2061,6 @@ buttonFrame.Size = UDim2.new(1, 0, 0, 255)
 createSmallButton("重置功能", Color3.fromRGB(220, 53, 69), "🔄", UDim2.new(0, 87.5, 0, eatWorldY + 90), function()
     resetAllFeatures()
 end)
+
+
+
